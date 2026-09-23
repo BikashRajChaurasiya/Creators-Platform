@@ -1,0 +1,29 @@
+# Node
+**/node_modules
+**/.next
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+# Python
+ai-service/.venv/
+**/__pycache__/
+**/*.pyc
+ai-service/.pytest_cache/
+
+# Env / secrets
+**/.env
+**/.env.local
+
+# Editor & OS
+.idea/
+.vscode/
+.DS_Store
+
+# Git
+.git/
+
+# Playwright / smoke scratch
+**/test-results/
+**/playwright-report/
+**/blob-report/

@@ -1,0 +1,140 @@
+# ============================================================
+# UGCNP full stack
+#   docker compose up -d postgres redis minio   -> infra only (dev)
+#   docker compose up -d --build                -> full stack
+#   docker compose --profile dev up -d --build  -> full stack + pgadmin
+# ============================================================
+
+name: ugcnp
+
+x-postgres-common: &postgres-common
+  image: postgres:16-alpine
+  restart: unless-stopped
+  environment:
+    POSTGRES_USER: ${POSTGRES_USER:-ugcnp}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ugcnp}
+    POSTGRES_DB: ${POSTGRES_DB:-ugcnp}
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ugcnp} -d ${POSTGRES_DB:-ugcnp}"]
+    interval: 5s
+    timeout: 5s
+    retries: 10
+
+services:
+  # ----------------------------------------------------------
+  postgres:
+    <<: *postgres-common
+    container_name: ugcnp-postgres
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ugcnp_postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: ugcnp-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - ugcnp_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: ugcnp-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ugcnp-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ugcnp-minio-secret}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - ugcnp_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ----------------------------------------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend/Dockerfile
+    container_name: ugcnp-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ugcnp}:${POSTGRES_PASSWORD:-ugcnp}@postgres:5432/${POSTGRES_DB:-ugcnp}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me}
+      STORAGE_ENDPOINT: minio:9000
+      STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-ugcnp-minio}
+      STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-ugcnp-minio-secret}
+      STORAGE_BUCKET: ugcnp-media
+      STORAGE_USE_SSL: "false"
+      STORAGE_PUBLIC_BASE: http://localhost:${MINIO_PORT:-9000}/ugcnp-media
+      AI_SERVICE_URL: http://ai-service:5001
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: ../docker/ai-service/Dockerfile
+    container_name: ugcnp-ai-service
+    restart: unless-stopped
+    ports:
+      - "${AI_PORT:-5001}:5001"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${API_URL:-http://localhost:4000}
+        NEXT_PUBLIC_AI_URL: ${AI_URL:-http://localhost:5001}
+        NEXT_PUBLIC_WS_URL: ${WS_URL:-http://localhost:4000}
+    container_name: ugcnp-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+  # ----------------------------------------------------------
+  # Optional dev tooling
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ugcnp-pgadmin
+    restart: unless-stopped
+    profiles: ["dev"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ugcnp.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      - postgres
+
+volumes:
+  ugcnp_postgres_data:
+  ugcnp_redis_data:
+  ugcnp_minio_data:

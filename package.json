@@ -1,0 +1,35 @@
+{
+  "name": "ugcnp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UGCNP — Nepal Creator Economy Operating System",
+  "workspaces": [
+    "packages/*",
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./frontend --filter ./backend dev",
+    "dev:frontend": "pnpm --filter ugcnp-frontend dev",
+    "dev:backend": "pnpm --filter ugcnp-backend start:dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:backend": "pnpm --filter ugcnp-backend test",
+    "test:frontend": "pnpm --filter ugcnp-frontend test",
+    "db:migrate": "pnpm --filter ugcnp-backend prisma:migrate",
+    "db:seed": "pnpm --filter ugcnp-backend prisma:seed",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path \"\""
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "prettier": "^3.3.3",
+    "typescript-eslint": "^8.70.1"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@11.12.0"
+}

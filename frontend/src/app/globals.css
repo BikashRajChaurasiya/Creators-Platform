@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+
+:root {
+  --primary: #1b5e3b;
+  --accent: #a3e635;
+}
+
+body {
+  @apply bg-neutral-50 text-neutral-900 antialiased;
+}
+
+a {
+  @apply text-neutral-900;
+}

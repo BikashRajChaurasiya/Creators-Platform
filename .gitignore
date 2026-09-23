@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+.env.test
+!.env.example
+
+# AI service
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.joblib
+models/
+
+# Uploads / local storage
+uploads/
+storage/
+media/
+
+# Coverage & tests
+coverage/
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Prisma
+backend/prisma/*.db
+backend/prisma/dev.db

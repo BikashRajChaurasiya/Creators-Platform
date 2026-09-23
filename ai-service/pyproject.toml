@@ -1,0 +1,22 @@
+[project]
+name = "ugcnp-ai"
+version = "0.1.0"
+description = "UGCNP AI service — matching, content analysis, copy generation, prediction."
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn[standard]>=0.30,<1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<9", "httpx>=0.27,<1", "ruff>=0.6,<1"]
+
+[tool.uvicorn]
+port = 5001
+host = "0.0.0.0"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
