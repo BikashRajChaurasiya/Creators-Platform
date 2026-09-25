@@ -24,6 +24,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @ugcnp/shared build
       - run: pnpm --filter ugcnp-backend prisma:generate
+        env:
+          DATABASE_URL: "postgresql://ugcnp:ugcnp@localhost:5432/ugcnp?schema=public"
       - run: pnpm -r typecheck
       - run: pnpm -r lint
       - run: pnpm --filter ugcnp-backend test
@@ -44,6 +46,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @ugcnp/shared build
       - run: pnpm --filter ugcnp-backend prisma:generate
+        env:
+          DATABASE_URL: "postgresql://ugcnp:ugcnp@localhost:5432/ugcnp?schema=public"
       - run: pnpm --filter ugcnp-backend build
       - run: pnpm --filter ugcnp-frontend build
 
