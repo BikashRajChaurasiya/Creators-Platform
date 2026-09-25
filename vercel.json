@@ -3,7 +3,8 @@
   "services": {
     "frontend": {
       "root": "frontend",
-      "framework": "nextjs"
+      "framework": "nextjs",
+      "buildCommand": "pnpm --filter @ugcnp/shared build && pnpm run build"
     }
   }
 }
