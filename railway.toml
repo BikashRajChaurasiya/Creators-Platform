@@ -1,7 +1,0 @@
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "docker/backend/Dockerfile"
-
-[deploy]
-healthcheckPath = "/api/v1/health"
-healthcheckTimeout = 300

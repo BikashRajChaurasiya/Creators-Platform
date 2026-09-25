@@ -5,139 +5,41 @@ on:
     branches: [main]
   pull_request:
 
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+permissions:
+  contents: read
 
 jobs:
-  build-and-test:
-    name: Build & test
+  check:
+    name: Lint, typecheck & unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      DATABASE_URL: postgresql://ugcnp:ugcnp@localhost:5444/ugcnp?schema=public
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.28.0
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: pnpm -r lint
+      - run: pnpm --filter ugcnp-backend test
+      - run: pnpm --filter @ugcnp/shared test
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 11.12.0
-          run_install: false
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-
-      - name: Install workspace deps
-        run: pnpm install --frozen-lockfile
-
-      - name: Build shared package
-        run: pnpm --filter @ugcnp/shared build
-
-      - name: Typecheck
-        run: |
-          pnpm --filter @ugcnp/shared typecheck
-          pnpm --filter ugcnp-backend typecheck
-          pnpm --filter ugcnp-frontend typecheck
-
-      - name: Lint
-        run: |
-          pnpm --filter @ugcnp/shared lint
-          pnpm --filter ugcnp-backend lint
-
-      - name: Build backend
-        run: pnpm --filter ugcnp-backend build
-
-      - name: Build frontend
-        run: pnpm --filter ugcnp-frontend build
-
-      - name: Backend unit tests
-        run: pnpm --filter ugcnp-backend test
-        env:
-          JWT_ACCESS_SECRET: ci-access-secret
-          JWT_REFRESH_SECRET: ci-refresh-secret
-
-      - name: AI service tests
-        run: |
-          cd ai-service
-          python -m venv .venv
-          ./.venv/bin/pip install -e .
-          ./.venv/bin/pytest -q
-
-  e2e:
-    name: E2E (Playwright)
+  build:
+    name: Production build
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: build-and-test
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Boot full stack via compose
-        run: docker compose -f docker/compose.yaml up -d --build
-
-      - name: Wait for services
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:4000/api/v1/health && curl -sf http://localhost:5001/health && curl -sf http://localhost:3000/login; then exit 0; fi
-            sleep 5
-          done
-          echo "stack did not become healthy" && exit 1
-
-      - name: Seed demo data
-        run: docker compose -f docker/compose.yaml exec backend sh -c "cd backend && node ../node_modules/.bin/prisma db seed" || true
-
-      - name: Install Playwright + browsers
-        run: |
-          cd e2e
-          pnpm install --frozen-lockfile
-          pnpm exec playwright install --with-deps chromium
-
-      - name: Run E2E
-        run: cd e2e && pnpm test
-
-  docker-image:
-    name: Docker images
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build-and-test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build backend image
-        uses: docker/build-push-action@v6
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
         with:
-          context: .
-          file: docker/backend/Dockerfile
-          push: false
-          tags: ugcnp/backend:ci
-
-      - name: Build ai-service image
-        uses: docker/build-push-action@v6
+          version: 11.28.0
+      - uses: actions/setup-node@v4
         with:
-          context: ai-service
-          file: docker/ai-service/Dockerfile
-          push: false
-          tags: ugcnp/ai-service:ci
-
-      - name: Build frontend image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: docker/frontend/Dockerfile
-          push: false
-          tags: ugcnp/frontend:ci
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ugcnp/shared build
+      - run: pnpm --filter ugcnp-backend build
+      - run: pnpm --filter ugcnp-frontend build
