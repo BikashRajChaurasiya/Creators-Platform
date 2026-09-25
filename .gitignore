@@ -42,3 +42,4 @@ Thumbs.db
 # Prisma
 backend/prisma/*.db
 backend/prisma/dev.db
+.vercel

@@ -1,6 +1,7 @@
 # ============================================================
 # UGCNP backend — prisma migrate + serve.
-# Build context is the repo root (../).
+# Root Dockerfile so Railway (railpack) picks up a container build.
+# Build context is the repo root.
 # ============================================================
 
 FROM node:22-alpine AS deps
@@ -30,7 +31,6 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY packages ./packages
 COPY backend ./backend
 
-# shared must be compiled before backend build; prisma client generated from schema
 ENV DATABASE_URL="postgresql://ugcnp:ugcnp@postgres:5432/ugcnp?schema=public"
 RUN pnpm --filter @ugcnp/shared build && pnpm --filter ugcnp-backend prisma:generate && pnpm --filter ugcnp-backend build
 
