@@ -22,6 +22,8 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @ugcnp/shared build
+      - run: pnpm --filter ugcnp-backend prisma:generate
       - run: pnpm -r typecheck
       - run: pnpm -r lint
       - run: pnpm --filter ugcnp-backend test
@@ -41,5 +43,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @ugcnp/shared build
+      - run: pnpm --filter ugcnp-backend prisma:generate
       - run: pnpm --filter ugcnp-backend build
       - run: pnpm --filter ugcnp-frontend build
