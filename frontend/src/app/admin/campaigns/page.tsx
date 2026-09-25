@@ -3,7 +3,7 @@
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Card, EmptyState, Spinner } from '@/components/ui';
+import { Badge, Card, EmptyState, SkeletonCard } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
@@ -22,16 +22,19 @@ function AdminCampaigns({ session }: { session: Session }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Campaigns</h1>
+      <div>
+        <h1 className="text-xl font-semibold">Campaigns</h1>
+        <p className="text-sm text-neutral-500">All campaigns created by brands on the platform.</p>
+      </div>
       {loading ? (
-        <Spinner />
+        <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
       ) : error ? (
         <EmptyState message={error} />
       ) : data && data.length > 0 ? (
-        <Card className="p-0">
+        <Card className="overflow-x-auto p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-neutral-200 text-left text-xs text-neutral-400">
+              <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-400">
                 <th className="px-4 py-3">Campaign</th>
                 <th className="px-4 py-3">Brand</th>
                 <th className="px-4 py-3">Budget</th>
@@ -41,10 +44,10 @@ function AdminCampaigns({ session }: { session: Session }) {
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {data.map((c) => (
-                <tr key={c.id}>
+                <tr key={c.id} className="transition-colors hover:bg-neutral-50/60">
                   <td className="px-4 py-3 font-medium">{c.title}</td>
-                  <td className="px-4 py-3">{c.brand?.companyName ?? '—'}</td>
-                  <td className="px-4 py-3">{CURRENCY(c.budgetMin)} – {CURRENCY(c.budgetMax)}</td>
+                  <td className="px-4 py-3 text-neutral-600">{c.brand?.companyName ?? '—'}</td>
+                  <td className="px-4 py-3 tabular-nums">{CURRENCY(c.budgetMin)} – {CURRENCY(c.budgetMax)}</td>
                   <td className="px-4 py-3">
                     <Badge color={statusColor(c.status)}>{c.status}</Badge>
                   </td>
@@ -55,7 +58,7 @@ function AdminCampaigns({ session }: { session: Session }) {
           </table>
         </Card>
       ) : (
-        <EmptyState message="No campaigns found." />
+        <EmptyState title="No campaigns found" />
       )}
     </div>
   );

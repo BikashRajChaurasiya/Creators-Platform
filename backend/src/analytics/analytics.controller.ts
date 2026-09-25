@@ -28,6 +28,11 @@ export class AnalyticsController {
     return { data: this.analytics.platformStats(user as never, query) };
   }
 
+  @Get('platform/series')
+  platformSeries(@CurrentUser() user: never, @Query(new ZodValidationPipe(periodQuery)) query: { from?: string; to?: string }) {
+    return { data: this.analytics.platformSeries(user as never, query) };
+  }
+
   @Post('match')
   match(@CurrentUser() user: never, @Body() body: unknown) {
     return { data: this.analytics.match(user as never, body) };

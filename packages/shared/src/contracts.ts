@@ -16,9 +16,17 @@ import {
   DELIVERABLE_TYPES,
   USAGE_RIGHTS,
   USER_STATUSES,
+  PAYOUT_CHANNELS,
+  TASK_TYPES,
 } from './domain';
 
-const email = z.string().trim().toLowerCase().email('Invalid email address');
+const EMAIL_REGEX =
+  /^[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/;
+const email = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(EMAIL_REGEX, 'Invalid email address');
 const password = z
   .string()
   .min(8, 'Password must be at least 8 characters')
@@ -32,6 +40,41 @@ const phone = z
   .or(z.literal(''));
 
 // ------------------------------------------------------------------ auth
+const username = z
+  .string()
+  .trim()
+  .min(3, 'Username must be at least 3 characters')
+  .max(40)
+  .regex(/^[a-zA-Z0-9_]+$/, 'Only letters, numbers and underscores')
+  .optional()
+  .or(z.literal(''));
+
+export const brandSignupSchema = z
+  .object({
+    companyName: z.string().trim().min(2, 'Company name is required').max(150),
+    industry: z.string().trim().max(100),
+    website: z.string().trim().url('Invalid URL').optional().or(z.literal('')),
+    description: z.string().trim().max(2000).optional().or(z.literal('')),
+    address: z.string().trim().max(200).optional().or(z.literal('')),
+  })
+  .strict();
+
+export const creatorSignupSchema = z
+  .object({
+    username,
+    bio: z.string().trim().max(1000).optional().or(z.literal('')),
+    city: z.string().trim().max(100).optional().or(z.literal('')),
+    district: z.string().trim().max(100).optional().or(z.literal('')),
+    category: z.enum(CREATOR_CATEGORIES).optional(),
+    instagram: z.string().trim().max(255).optional().or(z.literal('')),
+    tiktok: z.string().trim().max(255).optional().or(z.literal('')),
+    youtube: z.string().trim().max(255).optional().or(z.literal('')),
+    facebook: z.string().trim().max(255).optional().or(z.literal('')),
+    followersEstimate: z.number().int().min(0).optional(),
+    engagementRate: z.number().min(0).max(100).optional(),
+  })
+  .strict();
+
 export const registerSchema = z
   .object({
     name: z.string().trim().min(2, 'Name is required').max(100),
@@ -39,6 +82,8 @@ export const registerSchema = z
     password,
     phone,
     role: z.enum(USER_ROLES),
+    username,
+    profile: z.union([brandSignupSchema, creatorSignupSchema]).optional(),
   })
   .strict();
 
@@ -66,6 +111,14 @@ export const verifyOtpSchema = z
 
 export const refreshTokenSchema = z.object({ refreshToken: z.string().min(10) }).strict();
 
+export const resetPasswordSchema = z
+  .object({
+    email,
+    code: z.string().length(6, 'Code must be 6 digits').regex(/^\d{6}$/),
+    newPassword: password,
+  })
+  .strict();
+
 // ------------------------------------------------------------------ creators
 export const creatorProfileSchema = z
   .object({
@@ -82,6 +135,14 @@ export const creatorProfileSchema = z
     rateMin: z.number().int().nonnegative().optional(),
     rateMax: z.number().int().nonnegative().optional(),
     availableForWork: z.boolean().optional(),
+    username,
+    followersEstimate: z.number().int().min(0).optional(),
+    engagementRate: z.number().min(0).max(100).optional(),
+    collaborations: z.array(z.string().trim().max(200)).max(50).optional(),
+    payoutChannel: z.enum(PAYOUT_CHANNELS).optional(),
+    payoutChannelDetail: z.string().trim().max(120).optional().or(z.literal('')),
+    fallbackChannel: z.enum(PAYOUT_CHANNELS).optional(),
+    fallbackChannelDetail: z.string().trim().max(120).optional().or(z.literal('')),
   })
   .strict();
 
@@ -207,10 +268,30 @@ export const paymentCreateSchema = z
 
 export const paymentApproveSchema = z.object({ status: z.enum(['APPROVED', 'PAID', 'FAILED', 'CANCELLED']) }).strict();
 
+export const paymentReleaseSchema = z
+  .object({
+    channel: z.enum(PAYOUT_CHANNELS).optional(),
+    providerRef: z.string().trim().max(120).optional().or(z.literal('')),
+    failed: z.boolean().default(false).optional(),
+    note: z.string().trim().max(500).optional().or(z.literal('')),
+  })
+  .strict();
+
+export const disputeRaiseSchema = z
+  .object({
+    subject: z.string().trim().min(5, 'Subject must be at least 5 characters').max(150),
+    description: z.string().trim().min(20, 'Description must be at least 20 characters').max(3000),
+    campaignId: z.string().uuid(),
+    applicationId: z.string().uuid().optional(),
+  })
+  .strict();
+
 // ------------------------------------------------------------------ admin
 export const platformSettingsSchema = z
   .object({
     commissionPercent: z.number().int().min(0).max(60).optional(),
+    vatPercent: z.number().int().min(0).max(30).optional(),
+    tdsPercent: z.number().int().min(0).max(40).optional(),
     theme: z
       .object({
         primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),

@@ -320,7 +320,6 @@ async function main() {
     submissions: await prisma.submission.count(),
   };
   console.log('\nSeed complete:', JSON.stringify(total));
-  console.log('\nLogin credentials (all users): password =', PASSWORD);
 }
 
 main()

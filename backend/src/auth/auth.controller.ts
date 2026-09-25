@@ -15,15 +15,13 @@ import {
   requestOtpSchema,
   verifyOtpSchema,
   refreshTokenSchema,
+  resetPasswordSchema,
   z,
 } from '@ugcnp/shared';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { AuthService } from './auth.service';
-
-// reset-password body is intentionally permissive; validated inline in the service
-const resetPasswordBody = (body: unknown) => body as { email: string; code: string; newPassword: string };
 
 @Controller('auth')
 export class AuthController {
@@ -57,8 +55,8 @@ export class AuthController {
 
   @Public()
   @Post('reset-password')
-  resetPassword(@Body() body: { email: string; code: string; newPassword: string }) {
-    return this.auth.resetPassword(resetPasswordBody(body));
+  resetPassword(@Body(new ZodValidationPipe(resetPasswordSchema)) body: z.infer<typeof resetPasswordSchema>) {
+    return this.auth.resetPassword(body);
   }
 
   @Public()

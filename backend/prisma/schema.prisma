@@ -122,6 +122,13 @@ enum InvoiceStatus {
   CANCELLED
 }
 
+enum PayoutChannel {
+  ESEWA
+  KHALTI
+  IME_PAY
+  BANK
+}
+
 enum MessageType {
   TEXT
   FILE
@@ -173,6 +180,7 @@ model User {
   id                  String             @id @default(uuid())
   name                String
   email               String             @unique
+  username            String?            @unique
   phone               String?
   passwordHash        String?
   role                Role               @default(CREATOR)
@@ -247,6 +255,11 @@ model CreatorProfile {
   verificationStatus VerificationStatus @default(UNVERIFIED)
   followersEstimate  Int?
   engagementRate     Float?
+  collaborations     String[]           @default([])
+  payoutChannel      PayoutChannel?
+  payoutChannelDetail String?
+  fallbackChannel    PayoutChannel?
+  fallbackChannelDetail String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
@@ -452,6 +465,10 @@ model Payment {
   type        PaymentType   @default(CAMPAIGN_PAYOUT)
   status      PaymentStatus @default(PENDING)
   transactionId String?
+  preparedById String?
+  approvedById String?
+  channel     PayoutChannel?
+  providerRef String?
   description String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -570,6 +587,8 @@ model Task {
   description String?
   assigneeId  String?
   campaignId  String?
+  type        String       @default("GENERAL")
+  disputeId   String?      @unique
   status      String       @default("TODO") // TODO | IN_PROGRESS | BLOCKED | DONE
   priority    String       @default("MEDIUM")
   dueDate     DateTime?
@@ -577,6 +596,8 @@ model Task {
   completedAt DateTime?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  dispute     Dispute?     @relation(fields: [disputeId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([assigneeId])
@@ -590,11 +611,14 @@ model Dispute {
   subject    String
   description String
   status     DisputeStatus @default(OPEN)
+  slaDueAt   DateTime?
   resolution String?
   resolvedById String?
   resolvedAt DateTime?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+
+  task       Task?
 
   @@index([status])
 }

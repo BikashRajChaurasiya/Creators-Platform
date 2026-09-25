@@ -31,7 +31,6 @@ export function useApi<T>(path: string, token: string | null, deps: unknown[] = 
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, path, reloadKey, ...deps]);
 
   return { data, error, loading, reload };

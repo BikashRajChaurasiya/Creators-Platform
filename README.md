@@ -157,6 +157,26 @@ pnpm --filter ugcnp-backend lint          # eslint (gate = 0 errors)
 
 ## Related docs
 
+- `documentation/blueprint.md` — decision-ready product blueprint (monetization,
+  payments, compliance, disputes, media pipeline, UI redesign).
 - `documentation/setup.md` — full setup walkthrough.
 - `documentation/architecture.md` — services, auth flow, messaging, AI contract.
 - `documentation/api.md` — endpoint reference and request/response examples.
+
+**Blueprint status:** the money-moving core from the blueprint is implemented and
+verified end-to-end — commission-on-budget payments with maker–checker
+(prepare / approve / release by three distinct operators), Nepal payout channels,
+a revenue-vs-creator-dues ledger, VAT/TDS estimates, SLA-backed disputes that
+auto-create `DISPUTE` tasks, and the corresponding UI (creator payout stepper,
+admin finance ledger + maker–check queue, brand running spend, VAT/TDS settings).
+
+Self-serve is in place since then: brands initiate their own payouts to ACCEPTED
+creators (still operator-approved), invoices are auto-generated and released with
+each payout, creators submit campaign deliverables for review, and dashboards
+surface earnings, spend and recent activity. The admin analytics portal adds a
+time-series view (new users/campaigns/applications/submissions, platform revenue)
+with 7/30/90-day windows, and a full self-service password reset (OTP → new
+password) ships with login/docs.
+
+Landing on the remaining items (media pipeline, minors compliance, full UX
+redesigns) is tracked in `documentation/blueprint.md` §11–12.

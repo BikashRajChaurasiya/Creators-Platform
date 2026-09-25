@@ -16,11 +16,14 @@ import {
   requestOtpSchema,
   verifyOtpSchema,
   refreshTokenSchema,
+  brandSignupSchema,
+  creatorSignupSchema,
+  INTERNAL_ROLES,
   z,
 } from '@ugcnp/shared';
 import { UserRole, UserStatus } from '@ugcnp/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationService } from '../notification/notification.service';
+import { EmailService } from '../notification/email.service';
 import { JwtUser } from '../common/decorators/current-user.decorator';
 
 const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
@@ -33,20 +36,30 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
-    private readonly notifications: NotificationService,
+    private readonly email: EmailService,
   ) {}
 
   // ------------------------------------------------------------ register
   async register(body: z.infer<typeof registerSchema>) {
     const normalized = { ...body, email: body.email.toLowerCase() };
+    if (INTERNAL_ROLES.includes(normalized.role as UserRole)) {
+      throw new BadRequestException('Cannot register an internal role');
+    }
     const exists = await this.prisma.user.findUnique({ where: { email: normalized.email } });
     if (exists) throw new ConflictException('An account with this email already exists');
+    if (normalized.username) {
+      const nameTaken = await this.prisma.user.findUnique({
+        where: { username: normalized.username.toLowerCase() },
+      });
+      if (nameTaken) throw new ConflictException('That username is already taken');
+    }
 
     const passwordHash = await argon2.hash(normalized.password);
     const user = await this.prisma.user.create({
       data: {
         name: normalized.name,
         email: normalized.email,
+        username: normalized.username ? normalized.username.toLowerCase() : null,
         phone: normalized.phone || null,
         passwordHash,
         role: normalized.role as UserRole,
@@ -54,12 +67,37 @@ export class AuthService {
       },
     });
 
+    const profile = normalized.profile;
     if (normalized.role === 'CREATOR') {
-      await this.prisma.creatorProfile.create({ data: { userId: user.id } });
+      const p = (profile ?? {}) as z.infer<typeof creatorSignupSchema>;
+      await this.prisma.creatorProfile.create({
+        data: {
+          userId: user.id,
+          bio: p.bio || null,
+          city: p.city || null,
+          district: p.district || null,
+          category: p.category || null,
+          instagram: p.instagram || null,
+          tiktok: p.tiktok || null,
+          youtube: p.youtube || null,
+          facebook: p.facebook || null,
+          followersEstimate: p.followersEstimate,
+          engagementRate: p.engagementRate,
+        },
+      });
     }
     if (normalized.role === 'BRAND') {
+      const p = (profile ?? {}) as z.infer<typeof brandSignupSchema>;
       await this.prisma.brand.create({
-        data: { userId: user.id, companyName: normalized.name, contactPerson: normalized.name },
+        data: {
+          userId: user.id,
+          companyName: p.companyName || normalized.name,
+          industry: p.industry,
+          website: p.website || null,
+          contactPerson: normalized.name,
+          description: p.description || null,
+          address: p.address || null,
+        },
       });
     }
 
@@ -183,25 +221,50 @@ export class AuthService {
 
   // ------------------------------------------------------------ OTP
   private async sendOtp(userId: string, email: string, purpose: string): Promise<void> {
+    const emailLower = email.toLowerCase();
+
+    const recent = await this.prisma.verificationCode.findFirst({
+      where: { email: emailLower, purpose, createdAt: { gte: new Date(Date.now() - 60_000) } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (recent && !recent.consumedAt) {
+      throw new BadRequestException('A code was sent recently. Please wait about a minute before requesting another.');
+    }
+
     const code = String(randomInt(100000, 999999));
     const ttl = this.config.get<number>('EMAIL_OTP_EXPIRES', 300);
     await this.prisma.verificationCode.create({
       data: {
         userId,
-        email: email.toLowerCase(),
+        email: emailLower,
         codeHash: sha256(code),
         purpose,
         expiresAt: new Date(Date.now() + ttl * 1000),
       },
     });
-    await this.notifications.notify({
-      userId,
-      event: 'SYSTEM',
-      title: 'Your UGCNP verification code',
-      body: `Use code ${code} to complete your ${purpose.toLowerCase()}. It expires in 5 minutes.`,
-      email,
-      types: ['EMAIL'],
+
+    // In-app record (never stores the plaintext code) + branded email.
+    const theme = await this.email.platformTheme();
+    const purposeLabel =
+      purpose === 'LOGIN' ? 'log in' : purpose === 'PASSWORD_RESET' ? 'reset your password' : 'verify your account';
+    await this.prisma.notification.create({
+      data: {
+        userId,
+        event: 'SYSTEM',
+        type: 'EMAIL',
+        title: `Your ${theme.brandName} verification code was sent`,
+        body: `A 6-digit code to ${purposeLabel} was emailed to ${emailLower}. It expires in 5 minutes.`,
+      },
     });
+    await this.email.sendOtpBranded({
+      to: emailLower,
+      code,
+      purpose,
+      brandName: theme.brandName,
+      logoUrl: theme.logoUrl,
+      primaryColor: theme.primaryColor,
+    });
+    this.logger.log(`[OTP] sent ${purpose} code for ${emailLower}`);
   }
 
   async requestOtp(body: z.infer<typeof requestOtpSchema>) {
@@ -279,11 +342,18 @@ export class AuthService {
       where: { email, purpose: 'PASSWORD_RESET', consumedAt: null },
       orderBy: { createdAt: 'desc' },
     });
-    if (!record || record.expiresAt < new Date() || record.codeHash !== sha256(body.code)) {
-      throw new BadRequestException('Invalid or expired code');
+    if (!record || record.expiresAt < new Date()) {
+      throw new BadRequestException('Code expired, please request a new one');
     }
-    if (body.newPassword.length < 8) {
-      throw new BadRequestException('Password must be at least 8 characters');
+    if (record.attempts >= 5) {
+      throw new BadRequestException('Too many attempts, please request a new code');
+    }
+    if (record.codeHash !== sha256(body.code)) {
+      await this.prisma.verificationCode.update({
+        where: { id: record.id },
+        data: { attempts: { increment: 1 } },
+      });
+      throw new BadRequestException('Invalid or expired code');
     }
     const passwordHash = await argon2.hash(body.newPassword);
     await this.prisma.$transaction([

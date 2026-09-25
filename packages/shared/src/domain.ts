@@ -78,6 +78,15 @@ export type PaymentType = (typeof PAYMENT_TYPES)[number];
 export const INVOICE_STATUSES = ['DRAFT', 'SENT', 'PAID', 'OVERDUE', 'CANCELLED'] as const;
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 
+export const PAYOUT_CHANNELS = ['ESEWA', 'KHALTI', 'IME_PAY', 'BANK'] as const;
+export type PayoutChannel = (typeof PAYOUT_CHANNELS)[number];
+
+export const TASK_TYPES = ['GENERAL', 'DRAFT_REVIEW', 'DISPUTE', 'FINANCE', 'ESCALATION'] as const;
+export type TaskType = (typeof TASK_TYPES)[number];
+
+export const DISPUTE_SLA_DAYS = 7;
+export const DISPUTE_FIRST_RESPONSE_HOURS = 24;
+
 export const MESSAGE_TYPES = ['TEXT', 'FILE', 'SYSTEM'] as const;
 export type MessageType = (typeof MESSAGE_TYPES)[number];
 

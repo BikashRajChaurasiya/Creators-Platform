@@ -1,7 +1,22 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiClient } from '../common/services/ai.client';
 import { JwtUser } from '../common/decorators/current-user.decorator';
+
+interface DateRange {
+  from?: string;
+  to?: string;
+}
+
+export interface SeriesPoint {
+  date: string;
+  users: number;
+  campaigns: number;
+  applications: number;
+  submissions: number;
+  payments: number;
+  platformRevenue: number;
+}
 
 @Injectable()
 export class AnalyticsService {
@@ -59,10 +74,68 @@ export class AnalyticsService {
     };
   }
 
-  async platformStats(user: JwtUser, { from, to }: { from?: string; to?: string }) {
+  private periodRange(from?: string, to?: string, defaultDays = 30) {
+    const end = to ? new Date(to) : new Date();
+    const start = from ? new Date(from) : new Date(Date.now() - defaultDays * 86_400_000);
+    if (Number.isNaN(start.getTime())) throw new BadRequestException('Invalid "from" date');
+    if (Number.isNaN(end.getTime())) throw new BadRequestException('Invalid "to" date');
+    if (start.getTime() > end.getTime()) throw new BadRequestException('"from" must not be after "to"');
+    return { start, end };
+  }
+
+  async platformSeries(user: JwtUser, range: DateRange) {
     if (!['ADMIN', 'MANAGER'].includes(user.role)) throw new ForbiddenException('Access denied');
-    const whereDate = { gte: from ? new Date(from) : undefined, lte: to ? new Date(to) : undefined };
-    const [users, creators, brands, campaigns, activeCampaigns, applications, submissions, payments, revenue, invites, tasks, disputes] =
+    const { start, end } = this.periodRange(range.from, range.to);
+    const window = { gte: start, lte: end };
+    const select = { createdAt: true } as const;
+    const [users, campaigns, applications, submissions, payments] = await Promise.all([
+      this.prisma.user.findMany({ where: { createdAt: window }, select }),
+      this.prisma.campaign.findMany({ where: { createdAt: window }, select }),
+      this.prisma.application.findMany({ where: { createdAt: window }, select }),
+      this.prisma.submission.findMany({ where: { createdAt: window }, select }),
+      this.prisma.payment.findMany({ where: { createdAt: window }, select: { createdAt: true, amount: true, commissionAmount: true } }),
+    ]);
+
+    const empty = () =>
+      ({ users: 0, campaigns: 0, applications: 0, submissions: 0, payments: 0, platformRevenue: 0 }) as Omit<SeriesPoint, 'date'>;
+    const map = new Map<string, Omit<SeriesPoint, 'date'>>();
+
+    const bump = (points: { createdAt: Date }[], key: keyof Omit<SeriesPoint, 'date'>) => {
+      for (const p of points) {
+        const date = p.createdAt.toISOString().slice(0, 10);
+        const slot = map.get(date) ?? empty();
+        slot[key] += 1;
+        map.set(date, slot);
+      }
+    };
+    bump(users, 'users');
+    bump(campaigns, 'campaigns');
+    bump(applications, 'applications');
+    bump(submissions, 'submissions');
+    for (const p of payments) {
+      const date = p.createdAt.toISOString().slice(0, 10);
+      const slot = map.get(date) ?? empty();
+      slot.payments += 1;
+      slot.platformRevenue += p.commissionAmount ?? 0;
+      map.set(date, slot);
+    }
+
+    const series: SeriesPoint[] = [];
+    const cursor = new Date(start);
+    cursor.setHours(0, 0, 0, 0);
+    while (cursor.getTime() <= end.getTime()) {
+      const date = cursor.toISOString().slice(0, 10);
+      series.push({ date, ...(map.get(date) ?? empty()) });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return { from: start.toISOString(), to: end.toISOString(), series, days: series.length };
+  }
+
+  async platformStats(user: JwtUser, { from, to }: DateRange) {
+    if (!['ADMIN', 'MANAGER'].includes(user.role)) throw new ForbiddenException('Access denied');
+    const { start, end } = this.periodRange(from, to);
+    const window = { gte: start, lte: end };
+    const [users, creators, brands, campaigns, activeCampaigns, applications, submissions, payments, revenue, invites, tasks, disputes, period] =
       await Promise.all([
         this.prisma.user.count(),
         this.prisma.creatorProfile.count(),
@@ -76,6 +149,13 @@ export class AnalyticsService {
         this.prisma.campaignInvite.count(),
         this.prisma.task.count({ where: { status: { not: 'DONE' } } }),
         this.prisma.dispute.count({ where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } }),
+        Promise.all([
+          this.prisma.user.count({ where: { createdAt: window } }),
+          this.prisma.campaign.count({ where: { createdAt: window } }),
+          this.prisma.application.count({ where: { createdAt: window } }),
+          this.prisma.submission.count({ where: { createdAt: window } }),
+          this.prisma.payment.aggregate({ where: { createdAt: window }, _sum: { amount: true, commissionAmount: true } }),
+        ]),
       ]);
     return {
       users,
@@ -91,7 +171,16 @@ export class AnalyticsService {
       invitesSent: invites,
       openTasks: tasks,
       openDisputes: disputes,
-      period: whereDate,
+      period: {
+        from: start.toISOString(),
+        to: end.toISOString(),
+        newUsers: period[0],
+        newCampaigns: period[1],
+        newApplications: period[2],
+        newSubmissions: period[3],
+        grossVolume: period[4]._sum.amount ?? 0,
+        platformRevenue: period[4]._sum.commissionAmount ?? 0,
+      },
     };
   }
 

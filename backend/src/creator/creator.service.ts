@@ -25,30 +25,55 @@ export class CreatorService {
     const profile = await this.ensureProfile(userId);
     return this.prisma.creatorProfile.findUnique({
       where: { id: profile.id },
-      include: { portfolio: { orderBy: { createdAt: 'desc' } }, platforms: true },
+      include: {
+        portfolio: { orderBy: { createdAt: 'desc' } },
+        platforms: true,
+        user: { select: { id: true, name: true, username: true, avatarUrl: true, updatedAt: true } },
+      },
     });
   }
 
   async upsertProfile(userId: string, input: z.infer<typeof creatorProfileSchema>) {
     const existing = await this.ensureProfile(userId);
-    const profile = await this.prisma.creatorProfile.update({
-      where: { id: existing.id },
-      data: {
-        bio: input.bio || null,
-        city: input.city || null,
-        district: input.district || null,
-        language: input.language,
-        category: input.category || null,
-        instagram: input.instagram || null,
-        tiktok: input.tiktok || null,
-        youtube: input.youtube || null,
-        facebook: input.facebook || null,
-        skills: input.skills,
-        rateMin: input.rateMin,
-        rateMax: input.rateMax,
-        availableForWork: input.availableForWork,
-      },
-      include: { portfolio: true, platforms: true },
+
+    if (input.username) {
+      const normalized = input.username.toLowerCase();
+      const taken = await this.prisma.user.findFirst({
+        where: { username: normalized, id: { not: userId } },
+      });
+      if (taken) throw new BadRequestException('That username is already taken');
+    }
+
+    const profile = await this.prisma.$transaction(async (tx) => {
+      if (input.username) {
+        await tx.user.update({ where: { id: userId }, data: { username: input.username.toLowerCase() } });
+      }
+      return tx.creatorProfile.update({
+        where: { id: existing.id },
+        data: {
+          bio: input.bio || null,
+          city: input.city || null,
+          district: input.district || null,
+          language: input.language,
+          category: input.category || null,
+          instagram: input.instagram || null,
+          tiktok: input.tiktok || null,
+          youtube: input.youtube || null,
+          facebook: input.facebook || null,
+          skills: input.skills,
+          rateMin: input.rateMin,
+          rateMax: input.rateMax,
+          availableForWork: input.availableForWork,
+          followersEstimate: input.followersEstimate,
+          engagementRate: input.engagementRate,
+          collaborations: input.collaborations?.length ? input.collaborations : undefined,
+          payoutChannel: input.payoutChannel ?? null,
+          payoutChannelDetail: input.payoutChannelDetail || null,
+          fallbackChannel: input.fallbackChannel ?? null,
+          fallbackChannelDetail: input.fallbackChannelDetail || null,
+        },
+        include: { portfolio: true, platforms: true },
+      });
     });
 
     await this.prisma.platformLink.deleteMany({ where: { profileId: profile.id } });
@@ -107,7 +132,7 @@ export class CreatorService {
       include: {
         portfolio: { orderBy: { createdAt: 'desc' } },
         platforms: true,
-        user: { select: { id: true, name: true, avatarUrl: true, updatedAt: true } },
+user: { select: { id: true, name: true, username: true, avatarUrl: true, updatedAt: true } },
       },
     });
     if (!profile) throw new NotFoundException('Creator profile not found');
@@ -141,7 +166,7 @@ export class CreatorService {
 
     const where: Prisma.CreatorProfileWhereInput = conditions.length ? { AND: conditions } : {};
     const include = {
-      user: { select: { id: true, name: true, avatarUrl: true, updatedAt: true } },
+      user: { select: { id: true, name: true, username: true, avatarUrl: true, updatedAt: true } },
       platforms: true,
     } as const;
 

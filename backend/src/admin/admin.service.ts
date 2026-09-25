@@ -102,16 +102,25 @@ export class AdminService {
   }
 
   // ------------------------------------------------------------ tasks
-  async listTasks(query: { page?: number; limit?: number; status?: string }) {
-    const where: Prisma.TaskWhereInput = { status: query.status || undefined };
+  async listTasks(query: { page?: number; limit?: number; status?: string; type?: string }) {
+    const where: Prisma.TaskWhereInput = {
+      status: query.status || undefined,
+      type: query.type || undefined,
+    };
     const [items, total] = await Promise.all([
-      this.prisma.task.findMany({ where, orderBy: { createdAt: 'desc' }, skip: ((query.page ?? 1) - 1) * (query.limit ?? 20), take: query.limit ?? 20 }),
+      this.prisma.task.findMany({
+        where,
+        include: { dispute: { select: { id: true, subject: true, status: true, slaDueAt: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: ((query.page ?? 1) - 1) * (query.limit ?? 20),
+        take: query.limit ?? 20,
+      }),
       this.prisma.task.count({ where }),
     ]);
     return { data: items, meta: { page: query.page ?? 1, limit: query.limit ?? 20, total, totalPages: Math.ceil(total / (query.limit ?? 20)), hasNext: false, hasPrevious: false } };
   }
 
-  async createTask(actor: JwtUser, input: { title: string; description?: string; assigneeId?: string; campaignId?: string; priority?: string; dueDate?: string }) {
+  async createTask(actor: JwtUser, input: { title: string; description?: string; assigneeId?: string; campaignId?: string; priority?: string; dueDate?: string; type?: string }) {
     const task = await this.prisma.task.create({
       data: {
         title: input.title,
@@ -119,6 +128,7 @@ export class AdminService {
         assigneeId: input.assigneeId || null,
         campaignId: input.campaignId || null,
         priority: input.priority || 'MEDIUM',
+        type: input.type || 'GENERAL',
         dueDate: input.dueDate ? new Date(input.dueDate) : null,
         createdById: actor.userId,
       },
@@ -145,16 +155,66 @@ export class AdminService {
   // ------------------------------------------------------------ disputes
   async listDisputes(page = 1, limit = 20) {
     const [items, total] = await Promise.all([
-      this.prisma.dispute.findMany({ orderBy: { createdAt: 'desc' }, skip: (page - 1) * limit, take: limit }),
+      this.prisma.dispute.findMany({
+        include: {
+          task: { select: { id: true, status: true, dueDate: true, assigneeId: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
       this.prisma.dispute.count(),
     ]);
-    return { data: items, meta: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrevious: page > 1 } };
+    const raiserIds = [...new Set(items.map((d) => d.raisedById))];
+    const campaignIds = [...new Set(items.map((d) => d.campaignId).filter((id): id is string => !!id))];
+    const appIds = [...new Set(items.map((d) => d.applicationId).filter((id): id is string => !!id))];
+    const [raisers, campaigns, applications] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: raiserIds } },
+        select: { id: true, name: true, email: true, role: true },
+      }),
+      this.prisma.campaign.findMany({
+        where: { id: { in: campaignIds } },
+        select: { id: true, title: true },
+      }),
+      this.prisma.application.findMany({
+        where: { id: { in: appIds } },
+        select: { id: true, pitch: true },
+      }),
+    ]);
+    const raiserMap = new Map(raisers.map((u) => [u.id, u]));
+    const campaignMap = new Map(campaigns.map((c) => [c.id, c]));
+    const appMap = new Map(applications.map((a) => [a.id, a]));
+    const now = Date.now();
+    return {
+      data: items.map((d) => ({
+        ...d,
+        raisedBy: raiserMap.get(d.raisedById) ?? null,
+        campaign: d.campaignId ? (campaignMap.get(d.campaignId) ?? null) : null,
+        application: d.applicationId ? (appMap.get(d.applicationId) ?? null) : null,
+        sla: d.slaDueAt
+          ? {
+              dueAt: d.slaDueAt,
+              remainingSeconds: Math.max(0, Math.floor((d.slaDueAt.getTime() - now) / 1000)),
+              breached: d.slaDueAt.getTime() < now && d.status !== 'RESOLVED' && d.status !== 'CLOSED',
+            }
+          : null,
+      })),
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrevious: page > 1 },
+    };
   }
 
   async resolveDispute(actor: JwtUser, disputeId: string, resolution: string) {
-    const updated = await this.prisma.dispute.update({
-      where: { id: disputeId },
-      data: { resolution, status: 'RESOLVED', resolvedById: actor.userId, resolvedAt: new Date() },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const d = await tx.dispute.update({
+        where: { id: disputeId },
+        data: { resolution, status: 'RESOLVED', resolvedById: actor.userId, resolvedAt: new Date(), slaDueAt: null },
+      });
+      const task = await tx.task.findFirst({ where: { disputeId } });
+      if (task) {
+        await tx.task.update({ where: { id: task.id }, data: { status: 'DONE', completedAt: new Date() } });
+      }
+      return d;
     });
     await this.audit.log({ actor, action: 'dispute.resolve', targetType: 'Dispute', targetId: disputeId, metadata: { resolution } });
     return updated;
@@ -168,8 +228,12 @@ export class AdminService {
       return row ? row.value : fallback;
     };
     const envCommission = Number(process.env.PLATFORM_COMMISSION_PERCENT ?? 15);
+    const envVat = Number(process.env.PLATFORM_VAT_PERCENT ?? 13);
+    const envTds = Number(process.env.PLATFORM_TDS_PERCENT ?? 15);
     return {
       commissionPercent: (get('commissionPercent', envCommission) as number) ?? 15,
+      vatPercent: (get('vatPercent', envVat) as number) ?? 13,
+      tdsPercent: (get('tdsPercent', envTds) as number) ?? 15,
       theme: get('theme', {
         primaryColor: '#1B5E3B',
         accentColor: '#A3E635',
@@ -179,6 +243,34 @@ export class AdminService {
       maintenanceMode: get('maintenanceMode', false),
       signupsOpen: get('signupsOpen', true),
       emailFrom: get('emailFrom', 'UGCNP <no-reply@ugcnp.com>'),
+    };
+  }
+
+  async getPublicSettings() {
+    const settings = await this.getSettings();
+    return {
+      theme: settings.theme,
+      signupsOpen: settings.signupsOpen,
+      maintenanceMode: settings.maintenanceMode,
+    };
+  }
+
+  async getPublicStats() {
+    const [creators, brands, campaigns, applications, campaignsCompleted, paymentsProcessed] = await Promise.all([
+      this.prisma.creatorProfile.count(),
+      this.prisma.brand.count(),
+      this.prisma.campaign.count({ where: { status: 'RECRUITING' } }),
+      this.prisma.application.count(),
+      this.prisma.campaign.count({ where: { status: { in: ['COMPLETED', 'PUBLISHED'] } } }),
+      this.prisma.payment.aggregate({ where: { status: 'PAID' }, _sum: { amount: true } }),
+    ]);
+    return {
+      creators,
+      brands,
+      campaigns,
+      applications,
+      campaignsCompleted,
+      paymentsProcessed: paymentsProcessed._sum.amount ?? 0,
     };
   }
 

@@ -15,7 +15,7 @@ export class NotificationController {
     @CurrentUser('id') userId: string,
     @Query(new ZodValidationPipe(pageQuerySchema)) query: { page: number; limit: number },
   ) {
-    return this.notifications.listForUser(userId, query.page, query.limit);
+    return { data: await this.notifications.listForUser(userId, query.page, query.limit) };
   }
 
   @Get('unread-count')

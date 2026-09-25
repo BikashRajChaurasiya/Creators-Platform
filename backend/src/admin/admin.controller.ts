@@ -27,6 +27,8 @@ const roleSchema = z.object({ role: z.enum(['CREATOR', 'BRAND', 'ADMIN', 'MANAGE
 const settingsSchema = z
   .object({
     commissionPercent: z.number().int().min(0).max(60).optional(),
+    vatPercent: z.number().int().min(0).max(30).optional(),
+    tdsPercent: z.number().int().min(0).max(40).optional(),
     theme: z.object({ primaryColor: z.string(), accentColor: z.string(), logoUrl: z.string(), brandName: z.string() }).optional(),
     maintenanceMode: z.boolean().optional(),
     signupsOpen: z.boolean().optional(),
@@ -34,16 +36,18 @@ const settingsSchema = z
   })
   .partial();
 
-const taskQuery = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(50).default(20), status: z.string().optional() });
+const taskQuery = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(50).default(20), status: z.string().optional(), type: z.string().optional() });
 const taskSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(2000).optional().or(z.literal('')),
   assigneeId: z.string().uuid().optional().nullable(),
   campaignId: z.string().uuid().optional().nullable(),
+  type: z.enum(['GENERAL', 'DRAFT_REVIEW', 'DISPUTE', 'FINANCE', 'ESCALATION']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
   dueDate: z.string().datetime().optional().nullable(),
 });
 const taskUpdateSchema = z.object({ status: z.string().optional(), title: z.string().optional(), priority: z.string().optional(), assigneeId: z.string().optional().nullable() });
+const disputeResolveSchema = z.object({ resolution: z.string().trim().min(3, 'Resolution is required').max(3000) }).strict();
 
 const auditQuery = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(50), action: z.string().optional() });
 
@@ -87,10 +91,18 @@ export class AdminController {
     return this.payments.list(user as never, 'all', query.page, query.limit);
   }
 
+  // finance ledger (platform revenue vs creator dues, maker–checker queue)
+  @Get('finance')
+  @Roles('ADMIN', 'FINANCE')
+  @Permissions('payments.read')
+  finance() {
+    return { data: this.payments.financeOverview() };
+  }
+
   // tasks
   @Get('tasks')
   @Permissions('tasks.read')
-  listTasks(@Query(new ZodValidationPipe(taskQuery)) query: { page: number; limit: number; status?: string }) {
+  listTasks(@Query(new ZodValidationPipe(taskQuery)) query: { page: number; limit: number; status?: string; type?: string }) {
     return this.admin.listTasks(query);
   }
 
@@ -113,8 +125,8 @@ export class AdminController {
   }
 
   @Patch('disputes/:id/resolve')
-  resolve(@CurrentUser() user: never, @Param('id') id: string, @Body() body: { resolution: string }) {
-    return { data: this.admin.resolveDispute(user as never, id, body.resolution ?? 'Resolved') };
+  resolve(@CurrentUser() user: never, @Param('id') id: string, @Body(new ZodValidationPipe(disputeResolveSchema)) body: { resolution: string }) {
+    return { data: this.admin.resolveDispute(user as never, id, body.resolution) };
   }
 
   // reports / settings / audit

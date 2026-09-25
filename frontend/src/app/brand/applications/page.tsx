@@ -5,35 +5,43 @@ import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, statusColor } from '@/lib/ui';
 import { apiRequest } from '@/lib/api';
-import { Badge, Button, Card, EmptyState, Spinner } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, SkeletonCard } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
+import { useToast } from '@/components/toast';
 
 interface AppRow {
   id: string;
   status: string;
   pitch: string;
   createdAt: string;
-  creator: { user: { id: string; name: string } };
+  creator: { user: { id: string; name: string; avatarUrl?: string | null } };
   campaign: { id: string; title: string };
 }
 
 function ReceivedApps({ session }: { session: Session }) {
   const { data, loading, error, reload } = useApi<AppRow[]>('/applications?scope=received&limit=50', session.tokens.accessToken);
   const [tab, setTab] = useState('ALL');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const toast = useToast();
+
   const list = (data ?? []).filter((a) => tab === 'ALL' || a.status === tab);
   const tabs = ['ALL', ...Array.from(new Set((data ?? []).map((a) => a.status)))];
 
   async function review(a: AppRow, decision: 'SHORTLISTED' | 'ACCEPTED' | 'REJECTED') {
+    setBusyId(a.id);
     try {
       await apiRequest('/applications/' + a.id + '/review', {
         method: 'POST',
         token: session.tokens.accessToken,
         body: { decision, note: '' },
       });
+      toast.success(`Application ${decision.toLowerCase()}.`);
       reload();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Review failed');
+      toast.error(e instanceof Error ? e.message : 'Review failed');
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -41,14 +49,19 @@ function ReceivedApps({ session }: { session: Session }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Applications received</h1>
+      <div>
+        <h1 className="text-xl font-semibold">Applications received</h1>
+        <p className="text-sm text-neutral-500">Review creator pitches and decide who joins your campaign.</p>
+      </div>
       <div className="flex flex-wrap gap-2">
         {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              tab === t ? 'bg-[#1b5e3b] text-white' : 'border border-neutral-300 text-neutral-600 hover:bg-neutral-100'
+            className={`rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-150 ${
+              tab === t
+                ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-sm'
+                : 'border border-neutral-300 bg-white text-neutral-600 hover:border-primary hover:text-primary'
             }`}
           >
             {t}
@@ -56,13 +69,13 @@ function ReceivedApps({ session }: { session: Session }) {
         ))}
       </div>
       {loading ? (
-        <Spinner />
+        <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
       ) : error ? (
         <EmptyState message={error} />
       ) : list.length > 0 ? (
         <div className="flex flex-col gap-3">
           {list.map((a) => (
-            <Card key={a.id}>
+            <Card key={a.id} hover>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold">{reviewerName(a)}</p>
@@ -75,13 +88,13 @@ function ReceivedApps({ session }: { session: Session }) {
                   <Badge color={statusColor(a.status)}>{a.status}</Badge>
                   {a.status === 'PENDING' && (
                     <div className="flex gap-1.5">
-                      <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => review(a, 'SHORTLISTED')}>
+                      <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === a.id} onClick={() => review(a, 'SHORTLISTED')}>
                         Shortlist
                       </Button>
-                      <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => review(a, 'ACCEPTED')}>
+                      <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === a.id} onClick={() => review(a, 'ACCEPTED')}>
                         Accept
                       </Button>
-                      <Button variant="outline" className="px-3 py-1 text-xs text-red-600" onClick={() => review(a, 'REJECTED')}>
+                      <Button variant="outline" className="px-3 py-1 text-xs text-red-600" disabled={busyId === a.id} onClick={() => review(a, 'REJECTED')}>
                         Reject
                       </Button>
                     </div>
@@ -92,7 +105,10 @@ function ReceivedApps({ session }: { session: Session }) {
           ))}
         </div>
       ) : (
-        <EmptyState message="No applications received yet." />
+        <EmptyState
+          title="No applications received yet"
+          message="When creators apply to your campaigns, their pitches will show up here."
+        />
       )}
     </div>
   );

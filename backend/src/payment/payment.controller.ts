@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { paymentCreateSchema, z } from '@ugcnp/shared';
+import { paymentCreateSchema, paymentReleaseSchema, z } from '@ugcnp/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { PaymentService } from './payment.service';
@@ -29,6 +29,21 @@ export class PaymentController {
   @Get('summary')
   summary(@CurrentUser() user: never) {
     return { data: this.payments.summary(user as never) };
+  }
+
+  @Get('invoices')
+  invoices(@CurrentUser() user: never, @Query(new ZodValidationPipe(listQuery)) query: { page: number; limit: number }) {
+    return this.payments.listInvoices(user as never, query.page, query.limit);
+  }
+
+  @Post(':id/approve')
+  approve(@CurrentUser() user: never, @Param('id') id: string) {
+    return { data: this.payments.approve(user as never, id) };
+  }
+
+  @Post(':id/release')
+  release(@CurrentUser() user: never, @Param('id') id: string, @Body(new ZodValidationPipe(paymentReleaseSchema)) body: z.infer<typeof paymentReleaseSchema>) {
+    return { data: this.payments.release(user as never, id, body) };
   }
 
   @Patch(':id/status')

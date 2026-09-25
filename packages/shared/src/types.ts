@@ -84,8 +84,19 @@ export interface GeneratedCopy {
   description: string;
 }
 
+export interface PlatformStats {
+  creators: number;
+  brands: number;
+  campaigns: number;
+  applications: number;
+  campaignsCompleted: number;
+  paymentsProcessed: number;
+}
+
 export interface Settings {
   commissionPercent: number;
+  vatPercent: number;
+  tdsPercent: number;
   theme: {
     primaryColor: string;
     accentColor: string;
@@ -99,6 +110,8 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   commissionPercent: 15,
+  vatPercent: 13,
+  tdsPercent: 15,
   theme: {
     primaryColor: '#1B5E3B',
     accentColor: '#A3E635',

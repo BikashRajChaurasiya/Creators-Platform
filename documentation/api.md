@@ -9,16 +9,24 @@ All responses are wrapped: `{ "data": ... }`. Errors return a JSON body with
 
 | Method | Path       | Auth  | Body / Cursor                 | Returns                     |
 | ------ | ---------- | ----- | ----------------------------- | --------------------------- |
-| POST   | /register  | -     | `email,password,name,role`    | user (OTP sent)             |
+| POST   | /register  | -     | `email,password,name,role, username?, profile?` | user (OTP sent)             |
 | POST   | /login     | -     | `email,password`              | `{ accessToken }` + refresh cookie |
-| POST   | /request-otp | -  | `email`                       | `{ sent }`                  |
-| POST   | /verify-otp | -   | `email,otpCode`               | user                        |
-| POST   | /reset-password | - | `email,otpCode,newPassword` | user                        |
+| POST   | /request-otp | -  | `email, purpose` (`REGISTER`\|`LOGIN`\|`PASSWORD_RESET`) | `{ sent }` |
+| POST   | /verify-otp | -   | `email, code, purpose`        | user (REGISTER) or `{ verified: true }` (PASSWORD_RESET) |
+| POST   | /reset-password | - | `email, code, newPassword`  | `{ ok: true }`               |
 | POST   | /refresh   | cookie | -                            | `{ accessToken }`           |
 | POST   | /logout    | -     | -                            | cleared cookie              |
 | POST   | /logout-all | JWT  | -                            | revokes all refresh tokens  |
 | GET    | /me        | JWT   | -                            | current user                |
 | GET    | /google    | -     | -                            | redirect to Google OAuth    |
+
+Register notes:
+- `role` must be `CREATOR` or `BRAND` (internal roles `ADMIN/MANAGER/QA/FINANCE` are rejected).
+- Optional `username` (unique, lowercased; back-filled for old accounts from the email local part + id suffix).
+- Role-specific `profile` union is persisted:
+  - creator: `bio, city, district, category, instagram, tiktok, youtube, facebook, followersEstimate, engagementRate`
+  - brand: `companyName, industry, website, description, address` (fallback `companyName = name`)
+- A `PASSWORD_RESET` code is the required first step; `reset-password` consumes the code once, enforces password rules, and bumps `refreshTokenVersion` (signs out all existing sessions).
 
 ## Current user (`/users`)
 
@@ -112,14 +120,32 @@ X, LINKEDIN`.
 | POST   | /read-all | JWT | mark all read |
 | GET    | /health | -   | service health (public) |
 
-## Payments (`/payments`)
+## Payments (`/payments`) — maker–checker
+
+Lifecycle: `PENDING --(approve by 2nd person)--> APPROVED --(release by 3rd person)--> PAID`.
+A single operator can never both prepare and approve/release a payment. `channel`/`providerRef`
+record the actual disbursement rail (ESEWA | KHALTI | IME_PAY | BANK | CASH).
+On release, any DRAFT invoices for that campaign are marked PAID with `paidAt` in the same transaction.
 
 | Method | Path | Auth | Notes |
 | ------ | ---- | ---- | ----- |
-| POST   | / | JWT | initiate payment |
-| GET    | / | JWT | list payments |
-| GET    | /summary | JWT | balance summary |
-| PATCH  | /:id/status | JWT | transition status |
+| POST   | / | ADMIN/FINANCE or BRAND | operator: `{ creatorId, campaignId, amount, type?, description? }` with an ACCEPTED application for that creator/campaign. Brand (campaign owner): creates a **PENDING** payout `{ creatorId, campaignId, amount, description? }` for an ACCEPTED creator on their own campaign — an operator must still approve + release (maker–checker preserved) |
+| GET    | / | JWT | list; `?scope=outgoing\|received\|all&page=&limit=` |
+| GET    | /summary | JWT | balance summary (creator: Payouts / balance by channel; brand: total-billed, spend incl. VAT) |
+| GET    | /invoices | BRAND/ADMIN/FINANCE/MANAGER | paged `{ data, meta }`; BRAND = their own brand's invoices, CREATOR = 403 |
+| POST   | /:id/approve | ADMIN/FINANCE | 403 if caller is the preparer |
+| POST   | /:id/release | ADMIN/FINANCE | `{ channel?, providerRef?, failed?, note? }`; 403 if caller prepared or approved |
+| PATCH  | /:id/status | ADMIN/FINANCE | restricted to `FAILED\|REFUNDED\|CANCELLED` (cannot bypass maker–check) |
+
+## Disputes (`/disputes`) — SLA-backed
+
+Raising a dispute auto-creates a `DISPUTE`-type task (priority HIGH, `slaDueAt` = +7 days)
+assigned to the first active MANAGER (else ADMIN). Admin resolve completes the linked task.
+
+| Method | Path | Auth | Notes |
+| ------ | ---- | ---- | ----- |
+| POST   | / | CREATOR/BRAND | `{ subject, description, campaignId, applicationId? }`; standing + duplicate-OPEN checks |
+| GET    | /mine | CREATOR/BRAND | my disputes (includes linked task) |
 
 ## Uploads (`/upload`)
 
@@ -135,7 +161,8 @@ X, LINKEDIN`.
 | ------ | ---- | ---- | ----- |
 | GET    | /creator/:id | JWT | creator stats |
 | GET    | /brand/:id | JWT | brand stats |
-| GET    | /platform | JWT | platform overview |
+| GET    | /platform | ADMIN/MANAGER | platform overview; add `?from=&to=` (ISO dates) to also receive a `period` block `{ from, to, newUsers, newCampaigns, newApplications, newSubmissions, grossVolume, platformRevenue }` |
+| GET    | /platform/series | ADMIN/MANAGER | daily time series `?from=&to=` → `{ data: { from, to, days, series: [{ date, users, campaigns, applications, submissions, payments, platformRevenue }] } }` (UTC days, gaps filled) |
 | POST   | /match | JWT | AI creator matching `{ campaignId, brief? }` |
 | POST   | /copy | JWT | AI copy generation `{ brief, tone? }` |
 | POST   | /predict | JWT | AI engagement prediction `{ idea, platform? }` |
@@ -148,15 +175,16 @@ X, LINKEDIN`.
 | PATCH  | /users/:id/status | ADMIN | suspend/activate |
 | PATCH  | /users/:id/role | ADMIN | change role |
 | GET    | /campaigns | ADMIN | all campaigns |
-| GET    | /payments | ADMIN | all payments |
-| GET    | /tasks | ADMIN | moderation tasks |
+| GET    | /payments | ADMIN/FINANCE | all payments |
+| GET    | /finance | ADMIN/FINANCE | `{ platformRevenue{commissionCollected, reservedCommission, vatOnCommission, vatPercent, total}, creatorDues{paidOut, outstanding, outstandingCount, tdsWithheld, tdsPercent}, grossVolume, volumePending, payerCount, makerCheck{awaitingApproval, awaitingRelease}, channels[], invoices{} }` |
+| GET    | /tasks | ADMIN | moderation tasks (incl. `type` GENERAL/DRAFT_REVIEW/DISPUTE/FINANCE/ESCALATION) |
 | POST   | /tasks | ADMIN | create task |
 | PATCH  | /tasks/:id | ADMIN | update task |
-| GET    | /disputes | ADMIN | dispute list |
-| PATCH  | /disputes/:id/resolve | ADMIN | resolve dispute |
+| GET    | /disputes | ADMIN | dispute list (each includes `sla { dueAt, remainingSeconds, breached }`, raiser, campaign, application) |
+| PATCH  | /disputes/:id/resolve | ADMIN | `{ resolution }` — completes linked DISPUTE task |
 | GET    | /reports/summary | ADMIN | `{ users, creators, brands, campaigns, pendingApplications, submissions, grossVolume, platformRevenue }` |
-| GET    | /settings | ADMIN | platform settings |
-| PUT    | /settings | ADMIN | update settings |
+| GET    | /settings | ADMIN | platform settings (incl. `commissionPercent`, `vatPercent`, `tdsPercent`) |
+| PUT    | /settings | ADMIN | update settings (partial; validates 0–60/0–30/0–40) |
 | GET    | /audit-logs | ADMIN | audit log |
 
 ## Health (`/health`)

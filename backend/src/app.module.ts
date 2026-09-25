@@ -17,6 +17,8 @@ import { MessagingModule } from './messaging/messaging.module';
 import { NotificationModule } from './notification/notification.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AdminModule } from './admin/admin.module';
+import { DisputesModule } from './disputes/disputes.module';
+import { SettingsModule } from './settings/settings.module';
 import { HealthModule } from './health/health.module';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -55,6 +57,8 @@ import { validateEnv } from './common/config/env.validation';
     NotificationModule,
     AnalyticsModule,
     AdminModule,
+    DisputesModule,
+    SettingsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

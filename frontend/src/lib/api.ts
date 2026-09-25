@@ -93,8 +93,9 @@ export async function refreshTokens(): Promise<string> {
     throw new ApiError({ statusCode: 401, message: 'Refresh failed' });
   }
   if (typeof window !== 'undefined') {
-    localStorage.setItem('ugcnp.access', json.data.accessToken);
-    localStorage.setItem('ugcnp.refresh', json.data.refreshToken);
+    const storage = localStorage.getItem('ugcnp.refresh') ? localStorage : sessionStorage;
+    storage.setItem('ugcnp.access', json.data.accessToken);
+    storage.setItem('ugcnp.refresh', json.data.refreshToken);
   }
   refreshTokenStore = json.data.refreshToken;
   return json.data.accessToken;
