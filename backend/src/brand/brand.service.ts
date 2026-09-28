@@ -1,13 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { brandProfileSchema, z } from '@ugcnp/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class BrandService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    private readonly cache: CacheService,
   ) {}
 
   async ensureBrand(userId: string) {
@@ -42,7 +42,7 @@ export class BrandService {
         address: input.address || null,
       },
     });
-    await this.redis.del(`brand:${userId}`);
+    await this.cache.del(`brand:${userId}`);
     return updated;
   }
 

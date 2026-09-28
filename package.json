@@ -3,34 +3,52 @@
   "version": "0.1.0",
   "private": true,
   "description": "UGCNP — Nepal Creator Economy Operating System",
-  "workspaces": [
-    "packages/*",
-    "frontend",
-    "backend"
-  ],
   "scripts": {
     "dev": "pnpm --parallel --filter ./frontend --filter ./backend dev",
     "dev:frontend": "pnpm --filter ugcnp-frontend dev",
     "dev:backend": "pnpm --filter ugcnp-backend start:dev",
-    "build": "pnpm -r build",
+    "build": "pnpm --filter @ugcnp/shared build && pnpm --filter ugcnp-backend build && pnpm --filter ugcnp-frontend build",
+    "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test",
+    "test": "pnpm --filter \"!ugcnp-e2e\" -r test",
     "test:backend": "pnpm --filter ugcnp-backend test",
-    "test:frontend": "pnpm --filter ugcnp-frontend test",
+    "test:e2e": "pnpm --filter ugcnp-e2e test",
     "db:migrate": "pnpm --filter ugcnp-backend prisma:migrate",
+    "db:migrate:deploy": "pnpm --filter ugcnp-backend prisma:migrate:deploy",
     "db:seed": "pnpm --filter ugcnp-backend prisma:seed",
-    "format": "prettier --write \"**/*.{ts,tsx,json,md}\" --ignore-path \"\""
+    "db:generate": "pnpm --filter ugcnp-backend prisma:generate",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,yml,yaml}\" --ignore-path .gitignore",
+    "docker:up": "docker compose up -d --build",
+    "docker:start": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:restart": "docker compose restart",
+    "docker:logs": "docker compose logs -f",
+    "docker:ps": "docker compose ps",
+    "docker:seed": "docker compose exec -T backend sh -c \"cd backend && node ./node_modules/prisma/build/index.js db seed\"",
+    "docker:shell": "docker compose exec postgres psql -U ugcnp -d ugcnp"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "eslint": "^10.11.0",
     "prettier": "^3.3.3",
-    "railway": "^3.11.0",
     "typescript-eslint": "^8.70.1"
   },
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@11.28.0"
+  "packageManager": "pnpm@11.28.0",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BikashRajChaurasiya/Creators-Platform.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/BikashRajChaurasiya/Creators-Platform/issues"
+  },
+  "homepage": "https://github.com/BikashRajChaurasiya/Creators-Platform#readme"
 }

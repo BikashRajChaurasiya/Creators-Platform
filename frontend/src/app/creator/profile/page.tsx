@@ -6,7 +6,7 @@ import { CREATOR_CATEGORIES, PAYOUT_CHANNELS } from '@ugcnp/shared';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV } from '@/lib/ui';
-import { Card, Input, TextArea } from '@/components/ui';
+import { Card, EmptyState, Input, LoadingState, TextArea } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { UploadImageButton } from '@/components/image-upload';
 import { useApi } from '@/lib/use-api';
@@ -278,10 +278,10 @@ function CreatorProfilePageInner({ session }: { session: Session }) {
   const { data, loading, error } = useApi<CreatorProfile>('/creator/me/profile', session.tokens.accessToken);
 
   if (loading) {
-    return <p className="text-sm text-neutral-400">Loading profile…</p>;
+    return <LoadingState label="Loading profile…" />;
   }
   if (error) {
-    return <p className="text-sm text-red-600">{error}</p>;
+    return <EmptyState variant="error" message={error} />;
   }
   if (!data) return null;
 

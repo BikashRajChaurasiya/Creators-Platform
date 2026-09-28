@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir .
 
 EXPOSE 5001
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=6 \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:5001/health',timeout=3).status==200 else 1)"
+HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=6 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5001/health',timeout=3).status==200 else 1)"
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "5001"]

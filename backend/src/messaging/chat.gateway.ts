@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ConnectedSocket,
   MessageBody,
@@ -14,6 +15,8 @@ import { AuthService } from '../auth/auth.service';
 /**
  * Real-time chat transport. REST endpoints remain the source of truth;
  * the gateway reloads identity from the JWT and relays events per conversation room.
+ * Disabled unless WEBSOCKETS_ENABLED=true, because serverless runtimes cannot
+ * hold an upgraded connection open.
  */
 @WebSocketGateway({
   cors: { origin: '*', credentials: true },
@@ -25,10 +28,20 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(ChatGateway.name);
   private readonly userRooms = new Map<string, string[]>(); // socketId -> conversationIds
+  private readonly enabled: boolean;
 
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    config: ConfigService,
+  ) {
+    this.enabled = config.get<string>('WEBSOCKETS_ENABLED', 'false') === 'true';
+  }
 
   async handleConnection(client: Socket) {
+    if (!this.enabled) {
+      client.disconnect(true);
+      return;
+    }
     const token = this.extractToken(client);
     if (!token) {
       client.disconnect(true);
@@ -45,6 +58,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
+    if (!this.enabled) return;
     const userId = client.data.userId;
     if (userId) {
       client.leave(`user:${userId}`);
@@ -56,7 +70,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('conversation:join')
   handleJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { conversationId: string }) {
-    if (!data?.conversationId) return;
+    if (!this.enabled || !data?.conversationId) return;
     client.join(`conversation:${data.conversationId}`);
     const rooms = this.userRooms.get(client.id) ?? [];
     rooms.push(data.conversationId);
@@ -65,15 +79,17 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('conversation:leave')
   handleLeave(@ConnectedSocket() client: Socket, @MessageBody() data: { conversationId: string }) {
-    if (!data?.conversationId) return;
+    if (!this.enabled || !data?.conversationId) return;
     client.leave(`conversation:${data.conversationId}`);
   }
 
   emitToConversation(conversationId: string, event: string, payload: unknown) {
+    if (!this.enabled) return;
     this.server?.to(`conversation:${conversationId}`).emit(event, payload);
   }
 
   emitToUser(userId: string, event: string, payload: unknown) {
+    if (!this.enabled) return;
     this.server?.to(`user:${userId}`).emit(event, payload);
   }
 

@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma } from '@prisma/client';
 import { creatorProfileSchema, z } from '@ugcnp/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
+import { CacheService } from '../cache/cache.service';
 
 const FILE_KINDS = ['IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT', 'OTHER'] as const;
 
@@ -10,7 +10,7 @@ const FILE_KINDS = ['IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT', 'OTHER'] as const;
 export class CreatorService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
+    private readonly cache: CacheService,
   ) {}
 
   async ensureProfile(userId: string) {
@@ -89,7 +89,7 @@ export class CreatorService {
       });
     }
 
-    await this.redis.del(`creator:profile:${userId}`);
+    await this.cache.del(`creator:profile:${userId}`);
     return profile;
   }
 

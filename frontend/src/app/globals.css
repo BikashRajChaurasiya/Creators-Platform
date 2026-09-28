@@ -1,48 +1,127 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Brand tokens. `--primary`, `--accent` and `--brand-name` are overwritten at
+ * runtime by the admin theme editor (see src/lib/theme.tsx); everything else
+ * derives from them so both palettes stay consistent.
+ */
 @theme inline {
   --color-primary: var(--primary);
   --color-primary-dark: var(--primary-dark);
   --color-primary-soft: var(--primary-soft);
+  --color-primary-fg: var(--primary-fg);
   --color-accent: var(--accent);
   --color-accent-dark: var(--accent-dark);
   --color-surface: var(--surface);
+
+  --color-canvas: var(--canvas);
+  --color-elevated: var(--elevated);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-fg-inverse: var(--fg-inverse);
+
+  --radius-card: 0.75rem;
+  --shadow-card: 0 1px 2px 0 rgb(16 24 20 / 0.05);
+  --shadow-lift: 0 10px 25px -10px rgb(16 24 20 / 0.18);
 }
 
 :root {
   --primary: #1b5e3b;
   --primary-dark: #14482e;
   --primary-soft: rgba(27, 94, 59, 0.12);
+  --primary-fg: #ffffff;
   --accent: #a3e635;
   --accent-dark: #4d7c0f;
-  --surface: #ffffff;
   --brand-name: 'UGCNP';
+
+  --surface: #ffffff;
+  --canvas: #f7f7f6;
+  --elevated: #ffffff;
+  --line: #e5e5e3;
+  --line-strong: #d4d4d2;
+
+  --fg: #1c1c1a;
+  --fg-muted: #52524e;
+  --fg-subtle: #86867f;
+  --fg-inverse: #ffffff;
+
+  color-scheme: light;
 }
 
-html {
-  scroll-behavior: smooth;
+.dark {
+  --primary-soft: color-mix(in oklab, var(--primary) 22%, transparent);
+  --primary-fg: #ffffff;
+  --accent: #bef264;
+  --accent-dark: #d9f99d;
+
+  --surface: #17181a;
+  --canvas: #0f1011;
+  --elevated: #1c1d20;
+  --line: #2a2c30;
+  --line-strong: #3a3d42;
+
+  --fg: #ececea;
+  --fg-muted: #a9aba6;
+  --fg-subtle: #7d7f7a;
+  --fg-inverse: #10110f;
+
+  color-scheme: dark;
 }
 
-body {
-  @apply bg-neutral-50 text-neutral-900 antialiased;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas text-fg antialiased;
+  }
+
+  /* One consistent focus treatment across every interactive element. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-2 outline-offset-2 outline-primary;
+  }
+
+  ::selection {
+    background-color: var(--primary);
+    color: var(--primary-fg);
+  }
+
+  /* Native controls follow the theme instead of the OS default. */
+  :where(select, input, textarea, button) {
+    color: inherit;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
 }
 
-::selection {
-  background-color: var(--primary);
-  color: #fff;
+@layer components {
+  .card-surface {
+    background-color: var(--elevated);
+    border-color: var(--line);
+  }
 }
 
 /* Subtle branded scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--primary-soft) transparent;
+  scrollbar-color: var(--line-strong) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: var(--primary-soft);
+  background-color: var(--line-strong);
   border-radius: 8px;
 }
 
@@ -59,4 +138,30 @@ body {
 
 .animate-fade-in {
   animation: fade-in 0.35s ease-out both;
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-dialog-in {
+  animation: fade-in-scale 0.16s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

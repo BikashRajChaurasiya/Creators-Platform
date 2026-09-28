@@ -29,12 +29,14 @@ export class UploadService implements OnModuleInit {
     private readonly prisma: PrismaService,
   ) {
     this.bucket = config.get<string>('STORAGE_BUCKET', 'ugcnp-media');
-    this.publicBase = config.get<string>('STORAGE_PUBLIC_BASE', `http://localhost:9000/${this.bucket}`);
+    this.publicBase = config
+      .get<string>('STORAGE_PUBLIC_BASE', '')
+      .replace(/\/+$/, '');
     this.s3 = new S3Client({
-      endpoint: config.get<string>('STORAGE_ENDPOINT', 'localhost:9000'),
-      region: config.get<string>('STORAGE_REGION', 'us-east-1'),
-      forcePathStyle: true,
-      tls: config.get<string>('STORAGE_USE_SSL', 'false') === 'true',
+      region: config.get<string>('STORAGE_REGION', 'auto'),
+      endpoint: config.get<string>('STORAGE_ENDPOINT') || undefined,
+      forcePathStyle: config.get<string>('STORAGE_FORCE_PATH_STYLE', 'false') === 'true',
+      tls: config.get<string>('STORAGE_USE_SSL', 'true') === 'true',
       credentials: {
         accessKeyId: config.get<string>('STORAGE_ACCESS_KEY', ''),
         secretAccessKey: config.get<string>('STORAGE_SECRET_KEY', ''),
@@ -43,6 +45,7 @@ export class UploadService implements OnModuleInit {
   }
 
   async onModuleInit() {
+    if (this.config.get<string>('STORAGE_AUTO_CREATE', 'false') !== 'true') return;
     try {
       await this.s3.send(new CreateBucketCommand({ Bucket: this.bucket }));
     } catch (err) {

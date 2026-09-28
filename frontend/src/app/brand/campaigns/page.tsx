@@ -5,7 +5,7 @@ import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, CURRENCY, statusColor } from '@/lib/ui';
 import { ApiError, apiRequest } from '@/lib/api';
-import { Badge, Button, Card, EmptyState, Input, SkeletonCard, TextArea } from '@/components/ui';
+import { Alert, Badge, Button, Card, EmptyState, Input, Select, SkeletonCard, TextArea } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
@@ -43,25 +43,6 @@ const CREATOR_CATEGORIES = ['LIFESTYLE', 'BEAUTY', 'FASHION', 'FOOD', 'TRAVEL', 
 const PLATFORMS = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'FACEBOOK'] as const;
 const OBJECTIVES = ['BRAND_AWARENESS', 'PRODUCT_LAUNCH', 'SALES_CONVERSION', 'ENGAGEMENT', 'USER_GENERATED_CONTENT', 'TRAFFIC'] as const;
 const DELIVERABLES = ['REEL', 'SHORT', 'PHOTO_CAROUSEL', 'SINGLE_PHOTO', 'STORY', 'YOUTUBE_VIDEO', 'TIKTOK', 'FACEBOOK_POST'] as const;
-
-function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: readonly string[] }) {
-  return (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-neutral-600">{label}</span>
-      <select
-        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary-soft"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o.replace(/_/g, ' ')}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 function BrandCampaigns({ session }: { session: Session }) {
   const { data, loading, error, reload } = useApi<CampaignRow[]>('/campaigns/mine?limit=50', session.tokens.accessToken);
@@ -166,7 +147,11 @@ function BrandCampaigns({ session }: { session: Session }) {
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
         </div>
-      ) : summary.error ? null : summary.data ? (
+      ) : summary.error ? (
+        <Alert tone="warning" title="Spend summary unavailable">
+          {summary.error}
+        </Alert>
+      ) : summary.data ? (
         <Card className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <Metric label="Creator payouts" value={CURRENCY(summary.data.payoutsTotal)} />
           <Metric label="Platform fees" value={CURRENCY(summary.data.commissionTotal)} />
@@ -192,10 +177,50 @@ function BrandCampaigns({ session }: { session: Session }) {
                 placeholder="Tell creators what the campaign is about…"
               />
             </div>
-            <Select label="Objective" value={form.objective} onChange={(v) => set('objective', v)} options={OBJECTIVES} />
-            <Select label="Creator category" value={form.category} onChange={(v) => set('category', v)} options={CREATOR_CATEGORIES} />
-            <Select label="Platform" value={form.platforms} onChange={(v) => set('platforms', v)} options={PLATFORMS} />
-            <Select label="Deliverable type" value={form.deliverableType} onChange={(v) => set('deliverableType', v)} options={DELIVERABLES} />
+            <Select
+              label="Objective"
+              value={form.objective}
+              onChange={(e) => set('objective', e.target.value)}
+            >
+              {OBJECTIVES.map((o) => (
+                <option key={o} value={o}>
+                  {o.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Creator category"
+              value={form.category}
+              onChange={(e) => set('category', e.target.value)}
+            >
+              {CREATOR_CATEGORIES.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Platform"
+              value={form.platforms}
+              onChange={(e) => set('platforms', e.target.value)}
+            >
+              {PLATFORMS.map((o) => (
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="Deliverable type"
+              value={form.deliverableType}
+              onChange={(e) => set('deliverableType', e.target.value)}
+            >
+              {DELIVERABLES.map((o) => (
+                <option key={o} value={o}>
+                  {o.replace(/_/g, ' ')}
+                </option>
+              ))}
+            </Select>
             <Input label="Target locations (comma separated)" value={form.targetLocations} onChange={(e) => set('targetLocations', e.target.value)} />
             <Input label="Min followers" type="number" value={form.minFollowers} onChange={(e) => set('minFollowers', Number(e.target.value))} />
             <Input label="Language" value={form.language} onChange={(e) => set('language', e.target.value)} />

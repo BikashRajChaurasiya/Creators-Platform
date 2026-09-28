@@ -13,10 +13,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { FileInput, Megaphone, TrendingUp, Users } from 'lucide-react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV, CURRENCY } from '@/lib/ui';
-import { Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
+import { Card, EmptyState, SkeletonCard, StatCard, Tabs } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
@@ -100,19 +101,12 @@ function Analytics({ session }: { session: Session }) {
           <h1 className="text-xl font-semibold">Platform analytics</h1>
           <p className="text-sm text-neutral-500">Signups, campaigns, applications and commission by day.</p>
         </div>
-        <div className="flex rounded-full border border-neutral-300 bg-white p-1">
-          {PRESETS.map((p) => (
-            <button
-              key={p.days}
-              onClick={() => setDays(p.days)}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-all duration-150 ${
-                days === p.days ? 'bg-gradient-to-r from-primary to-primary-dark text-white shadow-sm' : 'text-neutral-600 hover:text-primary'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          label="Date range"
+          items={PRESETS.map((p) => ({ value: String(p.days), label: p.label }))}
+          value={String(days)}
+          onChange={(v) => setDays(Number(v))}
+        />
       </div>
 
       {report.loading ? (
@@ -123,10 +117,10 @@ function Analytics({ session }: { session: Session }) {
         <EmptyState message={report.error} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="New signups" value={r?.period.newUsers ?? 0} icon="👥" tint="primary" sub={`${r?.users ?? 0} total users`} />
-          <StatCard label="New campaigns" value={r?.period.newCampaigns ?? 0} icon="📢" tint="blue" sub={`${r?.campaigns ?? 0} all time`} />
-          <StatCard label="New applications" value={r?.period.newApplications ?? 0} icon="📥" tint="amber" sub={`${r?.applications ?? 0} all time`} />
-          <StatCard label="Comm. this period" value={CURRENCY(r?.period.platformRevenue ?? 0)} icon="📈" tint="green" sub="Platform fees earned in window" />
+          <StatCard label="New signups" value={r?.period.newUsers ?? 0} icon={Users} tint="primary" sub={`${r?.users ?? 0} total users`} />
+          <StatCard label="New campaigns" value={r?.period.newCampaigns ?? 0} icon={Megaphone} tint="blue" sub={`${r?.campaigns ?? 0} all time`} />
+          <StatCard label="New applications" value={r?.period.newApplications ?? 0} icon={FileInput} tint="amber" sub={`${r?.applications ?? 0} all time`} />
+          <StatCard label="Comm. this period" value={CURRENCY(r?.period.platformRevenue ?? 0)} icon={TrendingUp} tint="green" sub="Platform fees earned in window" />
         </div>
       )}
 

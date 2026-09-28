@@ -1,5 +1,12 @@
+/**
+ * In production the frontend and API are served from the same origin: vercel.json
+ * rewrites `/api/*` to the backend service, so no hostname is hardcoded and no
+ * CORS handshake happens. NEXT_PUBLIC_API_URL only exists to point a local dev
+ * build at a separately hosted API.
+ */
 export const API_BASE = (() => {
-  const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+  const base = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!base) return '/api/v1';
   return base.replace(/\/+$/, '').replace(/\/api\/v1$/, '') + '/api/v1';
 })();
 

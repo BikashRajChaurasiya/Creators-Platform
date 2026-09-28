@@ -4,7 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CommonModule } from './common/common.module';
 import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
+import { CacheModule } from './cache/cache.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { CreatorModule } from './creator/creator.module';
@@ -42,7 +42,7 @@ import { validateEnv } from './common/config/env.validation';
       }),
     }),
     PrismaModule,
-    RedisModule,
+    CacheModule,
     CommonModule,
     HealthModule,
     AuthModule,

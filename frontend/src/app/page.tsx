@@ -96,8 +96,7 @@ export default function HomePage() {
       {/* CTA */}
       <section className="mx-auto w-full max-w-6xl px-4 pb-20">
         <div
-          className="rounded-3xl p-10 text-center text-white sm:p-14"
-          style={{ backgroundImage: `linear-gradient(120deg, ${primaryColor}, #14532d)` }}
+          className="rounded-3xl bg-gradient-to-br from-primary to-primary-dark p-10 text-center text-[var(--primary-fg)] sm:p-14"
         >
           <h2 className="text-2xl font-bold sm:text-3xl">Ready to make something great?</h2>
           <p className="mx-auto mt-2 max-w-md text-white/80">
@@ -105,8 +104,7 @@ export default function HomePage() {
           </p>
           <Link
             href="/register"
-            className="mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-150 hover:-translate-y-0.5"
-            style={{ backgroundColor: '#A3E635', color: '#052e16' }}
+            className="mt-6 inline-block rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-accent-dark transition-all duration-150 hover:-translate-y-0.5 hover:brightness-110"
           >
             Create your account
           </Link>

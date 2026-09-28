@@ -34,7 +34,7 @@ export function Avatar({ name, url, size = 9, className = '' }: { name: string; 
         width={size * 4}
         height={size * 4}
         onError={() => setFailed(true)}
-        className={`rounded-full object-cover ring-2 ring-white ${className}`}
+        className={`rounded-full object-cover ring-2 ring-[var(--elevated)] ${className}`}
         style={{ width: dim, height: dim }}
       />
     );
@@ -43,7 +43,7 @@ export function Avatar({ name, url, size = 9, className = '' }: { name: string; 
   return (
     <span
       aria-hidden
-      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-white ring-2 ring-white ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full font-semibold text-white ring-2 ring-[var(--elevated)] ${className}`}
       style={{ width: dim, height: dim, fontSize: size * 1.6, backgroundColor: `hsl(${hue}, 48%, 45%)` }}
     >
       {initials(name) || '?'}

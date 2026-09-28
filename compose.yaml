@@ -1,0 +1,146 @@
+# ============================================================
+# UGCNP — full local stack
+#   docker compose up -d --build   -> postgres + ai + backend + frontend
+#   docker compose --profile dev up -d   -> adds pgAdmin
+#   docker compose logs -f backend      -> tail one service
+#
+# Redis and MinIO were removed from the stack. Cache is process-local and
+# object storage is optional; set STORAGE_* to use a real bucket.
+# ============================================================
+
+name: ugcnp
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ugcnp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ugcnp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ugcnp}
+      POSTGRES_DB: ${POSTGRES_DB:-ugcnp}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ugcnp_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-ugcnp} -d ${POSTGRES_DB:-ugcnp}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ------------------------------------------------------------------
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: ugcnp-ai-service
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "${AI_PORT:-5001}:5001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5001/health',timeout=3).status==200 else 1)",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 6
+
+  # ------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: ugcnp-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ai-service:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      # Direct connection, not a pool: this URL is used for DDL at startup.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ugcnp}:${POSTGRES_PASSWORD:-ugcnp}@postgres:5432/${POSTGRES_DB:-ugcnp}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-only-access-secret-change-me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-only-refresh-secret-change-me}
+      JWT_ACCESS_EXPIRES: "900"
+      JWT_REFRESH_EXPIRES: "2592000"
+      EMAIL_OTP_EXPIRES: "300"
+      EMAIL_MODE: ${EMAIL_MODE:-console}
+      SMTP_HOST: ${SMTP_HOST:-smtp.example.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-no-reply@ugcnp.com}
+      SMTP_PASS: ${SMTP_PASS:-change-me}
+      EMAIL_FROM: ${EMAIL_FROM:-UGCNP <no-reply@ugcnp.com>}
+      # Internal service name is correct here: this hop never leaves the network.
+      AI_SERVICE_URL: http://ai-service:5001
+      # Left blank on purpose. Uploads return a clear error until real
+      # S3-compatible credentials are supplied.
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_REGION: ${STORAGE_REGION:-auto}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-ugcnp-media}
+      STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:-}
+      STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:-}
+      STORAGE_USE_SSL: ${STORAGE_USE_SSL:-true}
+      STORAGE_FORCE_PATH_STYLE: ${STORAGE_FORCE_PATH_STYLE:-false}
+      STORAGE_AUTO_CREATE: ${STORAGE_AUTO_CREATE:-false}
+      STORAGE_PUBLIC_BASE: ${STORAGE_PUBLIC_BASE:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-console}
+      PLATFORM_COMMISSION_PERCENT: "15"
+      PLATFORM_VAT_PERCENT: "13"
+      PLATFORM_TDS_PERCENT: "15"
+      THROTTLE_TTL: "60"
+      THROTTLE_LIMIT: "120"
+      WEBSOCKETS_ENABLED: "false"
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+
+  # ------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        # Baked into the browser bundle, so this must be a host address.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: ugcnp-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+
+  # ------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ugcnp-pgadmin
+    restart: unless-stopped
+    profiles: ["dev"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@ugcnp.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "${PGADMIN_PORT:-5050}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  ugcnp_postgres_data:

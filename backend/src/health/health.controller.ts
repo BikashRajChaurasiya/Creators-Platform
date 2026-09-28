@@ -1,30 +1,24 @@
 import { Controller, Get } from '@nestjs/common';
 import { Public } from '../common/decorators/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
-import { RedisService } from '../redis/redis.service';
 
 @Controller('health')
 export class HealthController {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly redis: RedisService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   @Public()
   @Get()
   async check() {
-    let db = false;
+    let db: boolean;
     try {
       await this.prisma.$queryRaw`SELECT 1`;
       db = true;
     } catch {
       db = false;
     }
-    const redis = await this.redis.ping();
     return {
-      status: db && redis ? 'ok' : 'degraded',
+      status: db ? 'ok' : 'degraded',
       db,
-      redis,
       timestamp: new Date().toISOString(),
     };
   }

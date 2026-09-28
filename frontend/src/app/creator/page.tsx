@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { BriefcaseBusiness, CircleCheckBig, Clock, Wallet } from 'lucide-react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV, CURRENCY, statusColor } from '@/lib/ui';
@@ -64,15 +65,15 @@ function Dash({ session }: { session: Session }) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StatCard label="Applications" value={appList.length} icon="📋" tint="primary" sub={`${appList.length} across all campaigns`} />
-          <StatCard label="Pending" value={pendingCount} icon="⏳" tint="amber" sub="Waiting for review" />
-          <StatCard label="Selected" value={selectedCount} icon="⚡" tint="green" sub="Accepted or shortlisted" />
+          <StatCard label="Applications" value={appList.length} icon={BriefcaseBusiness} tint="primary" sub={`${appList.length} across all campaigns`} />
+          <StatCard label="Pending" value={pendingCount} icon={Clock} tint="amber" sub="Waiting for review" />
+          <StatCard label="Selected" value={selectedCount} icon={CircleCheckBig} tint="green" sub="Accepted or shortlisted" />
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <StatCard label="Total earned" value={CURRENCY(s?.totalEarned ?? 0)} icon="💰" tint="green" sub="Payouts received so far" />
-        <StatCard label="Awaiting release" value={CURRENCY(s?.totalOutstanding ?? 0)} icon="⏳" tint="amber" sub={`${s?.pendingCount ?? 0} pending or approved`} />
+        <StatCard label="Total earned" value={CURRENCY(s?.totalEarned ?? 0)} icon={Wallet} tint="green" sub="Payouts received so far" />
+        <StatCard label="Awaiting release" value={CURRENCY(s?.totalOutstanding ?? 0)} icon={Clock} tint="amber" sub={`${s?.pendingCount ?? 0} pending or approved`} />
         <Link href="/creator/payments" className="group">
           <Card className="h-full transition-all duration-200 hover:border-primary hover:shadow-md">
             <p className="text-sm text-neutral-500">Completed payouts</p>

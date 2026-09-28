@@ -1,11 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ArrowLeft, Send } from 'lucide-react';
 import { apiRequest } from '@/lib/api';
-import { Button, Card, EmptyState, Spinner } from '@/components/ui';
+import { Button, Card, EmptyState, Input, Spinner } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { Session } from '@/lib/session';
 import { useApi } from '@/lib/use-api';
+import { cn } from '@/lib/cn';
 
 interface Conversation {
   id: string;
@@ -47,7 +50,9 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
   const conv = useApi<Conversation[]>('/conversations', session.tokens.accessToken);
   const [active, setActive] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -55,13 +60,20 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
   async function open(c: Conversation) {
     setActive(c);
     setLoading(true);
+    setLoadError(null);
+    setMessages(null);
     try {
-      const data = await apiRequest<Message[]>('/conversations/' + c.id + '/messages', { token: session.tokens.accessToken });
+      const data = await apiRequest<Message[]>(`/conversations/${c.id}/messages`, {
+        token: session.tokens.accessToken,
+      });
       setMessages(data);
-      apiRequest('/conversations/' + c.id + '/read', { method: 'PATCH', token: session.tokens.accessToken }).catch(() => {});
+      apiRequest(`/conversations/${c.id}/read`, { method: 'PATCH', token: session.tokens.accessToken }).catch(
+        () => {},
+      );
       conv.reload();
-    } catch {
-      setMessages([]);
+    } catch (e) {
+      // A failed fetch must not masquerade as an empty thread.
+      setLoadError((e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -75,8 +87,9 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
     e.preventDefault();
     if (!active || !text.trim() || sending) return;
     setSending(true);
+    setSendError(null);
     try {
-      const msg = await apiRequest<Message>('/conversations/' + active.id + '/messages', {
+      const msg = await apiRequest<Message>(`/conversations/${active.id}/messages`, {
         method: 'POST',
         token: session.tokens.accessToken,
         body: { content: text.trim() },
@@ -84,6 +97,8 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
       setMessages((m) => [...(m ?? []), msg]);
       setText('');
       conv.reload();
+    } catch (e) {
+      setSendError((e as Error).message);
     } finally {
       setSending(false);
     }
@@ -94,34 +109,56 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
   const activePeer = active ? { name: peerName(active), avatarUrl: peerAvatar(active) } : null;
 
   return (
+    // Mobile shows one pane at a time: the thread replaces the list.
     <div className="grid grid-cols-1 gap-4 md:grid-cols-[300px_1fr]">
-      <Card className="max-h-[75vh] overflow-hidden p-0 md:max-h-[calc(100vh-8rem)] md:max-h-none">
-        <div className="border-b border-neutral-200 p-3">
-          <a href={newParticipantHref} className="block w-full rounded-lg border border-dashed border-neutral-300 px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary-soft">
+      <Card
+        className={cn(
+          'overflow-hidden p-0 md:max-h-[calc(100dvh-8rem)]',
+          active ? 'hidden md:flex md:flex-col' : 'flex flex-col',
+        )}
+      >
+        <div className="border-b border-line p-3">
+          <Link
+            href={newParticipantHref}
+            className="block w-full rounded-lg border border-dashed border-line-strong px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary-soft"
+          >
             + Start a conversation
-          </a>
+          </Link>
         </div>
         {conv.loading ? (
           <Spinner />
+        ) : conv.error ? (
+          <div className="p-3">
+            <EmptyState variant="error" message={conv.error} />
+          </div>
         ) : conv.data && conv.data.length > 0 ? (
-          <ul className="max-h-[60vh] divide-y divide-neutral-100 overflow-y-auto md:max-h-none">
+          <ul className="max-h-[55dvh] flex-1 divide-y divide-line overflow-y-auto md:max-h-none">
             {conv.data.map((c) => {
               const activeRow = active?.id === c.id;
               return (
                 <li key={c.id}>
                   <button
                     onClick={() => open(c)}
-                    className={`flex w-full items-center gap-3 px-3 py-3 text-left transition-colors ${
-                      activeRow ? 'bg-primary-soft' : 'hover:bg-neutral-50'
-                    }`}
+                    aria-current={activeRow ? 'true' : undefined}
+                    className={cn(
+                      'flex w-full items-center gap-3 px-3 py-3 text-left transition-colors',
+                      activeRow ? 'bg-primary-soft' : 'hover:bg-primary-soft/50',
+                    )}
                   >
                     <Avatar name={peerName(c)} url={peerAvatar(c)} size={9} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <p className="truncate text-sm font-medium text-neutral-800">{peerName(c)}</p>
-                        <span className="ml-2 shrink-0 text-[10px] text-neutral-400">{c.lastMessage ? timeAgo(c.updatedAt) : ''}</span>
+                        <p className="truncate text-sm font-medium text-fg">{peerName(c)}</p>
+                        <span className="ml-2 shrink-0 text-[10px] text-fg-subtle">
+                          {c.lastMessage ? timeAgo(c.updatedAt) : ''}
+                        </span>
                       </div>
-                      <p className={`mt-0.5 truncate text-xs ${c.unreadCount > 0 ? 'font-medium text-neutral-700' : 'text-neutral-400'}`}>
+                      <p
+                        className={cn(
+                          'mt-0.5 truncate text-xs',
+                          c.unreadCount > 0 ? 'font-medium text-fg' : 'text-fg-subtle',
+                        )}
+                      >
                         {c.unreadCount > 0 ? `● ${c.unreadCount} new · ` : ''}
                         {c.lastMessage ? c.lastMessage.content : 'No messages yet'}
                       </p>
@@ -132,37 +169,61 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
             })}
           </ul>
         ) : (
-          <EmptyState title="No conversations yet" message="Message a brand or creator to get started." />
+          <div className="p-3">
+            <EmptyState title="No conversations yet" message="Message a brand or creator to get started." />
+          </div>
         )}
       </Card>
 
-      <Card className="flex max-h-[75vh] flex-col p-0">
+      <Card className={cn('flex flex-col p-0 md:max-h-[calc(100dvh-8rem)]', active ? 'flex' : 'hidden md:flex')}>
         {!active ? (
-          <EmptyState title="Select a conversation" message="Choose a conversation on the left to start messaging." />
+          <EmptyState title="Select a conversation" message="Choose a conversation to start messaging." />
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b border-neutral-200 p-3">
+            <div className="flex items-center gap-2 border-b border-line p-3">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="md:hidden"
+                onClick={() => {
+                  setActive(null);
+                  setMessages(null);
+                  setLoadError(null);
+                }}
+                aria-label="Back to conversations"
+              >
+                <ArrowLeft />
+              </Button>
               <Avatar name={activePeer?.name ?? ''} url={activePeer?.avatarUrl ?? null} size={8} />
-              <p className="font-medium">{activePeer?.name}</p>
+              <p className="truncate font-medium text-fg">{activePeer?.name}</p>
             </div>
-            <div className="flex-1 space-y-3 overflow-y-auto p-4">
+
+            <div className="flex-1 space-y-3 overflow-y-auto p-4" role="log" aria-label="Messages" aria-live="polite">
               {loading ? (
                 <Spinner />
+              ) : loadError ? (
+                <EmptyState variant="error" message={loadError} />
               ) : messages && messages.length > 0 ? (
                 messages.map((m) => {
                   const mine = m.senderId === session.user.id;
                   return (
-                    <div key={m.id} className={`flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-                      {!mine && (
-                        <Avatar name={m.sender.name} url={m.sender.avatarUrl} size={6} />
-                      )}
+                    <div key={m.id} className={cn('flex items-end gap-2', mine ? 'justify-end' : 'justify-start')}>
+                      {!mine && <Avatar name={m.sender.name} url={m.sender.avatarUrl} size={6} />}
                       <div
-                        className={`max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm ${
-                          mine ? 'rounded-br-md bg-primary text-white' : 'rounded-bl-md bg-neutral-100 text-neutral-800'
-                        }`}
+                        className={cn(
+                          'max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm shadow-sm',
+                          mine
+                            ? 'rounded-br-md bg-primary text-[var(--primary-fg)]'
+                            : 'rounded-bl-md bg-canvas text-fg ring-1 ring-line',
+                        )}
                       >
-                        <p>{m.content}</p>
-                        <p className={`mt-0.5 text-right text-[10px] ${mine ? 'text-white/70' : 'text-neutral-400'}`}>
+                        <p className="whitespace-pre-wrap break-words">{m.content}</p>
+                        <p
+                          className={cn(
+                            'mt-0.5 text-right text-[10px]',
+                            mine ? 'opacity-70' : 'text-fg-subtle',
+                          )}
+                        >
                           {formatTime(m.createdAt)}
                         </p>
                       </div>
@@ -175,16 +236,26 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
               )}
               <div ref={bottomRef} />
             </div>
-            <form onSubmit={send} className="flex gap-2 border-t border-neutral-200 p-3">
-              <input
-                className="flex-1 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary-soft"
-                placeholder="Type a message…"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-              />
-              <Button type="submit" disabled={sending || !text.trim()}>
-                Send
-              </Button>
+
+            <form onSubmit={send} className="flex flex-col gap-2 border-t border-line p-3">
+              {sendError && (
+                <p role="alert" className="text-xs text-red-600">
+                  {sendError}
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Message"
+                  placeholder="Type a message…"
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  autoComplete="off"
+                />
+                <Button type="submit" disabled={sending || !text.trim()} loading={sending}>
+                  <Send />
+                  <span className="sr-only sm:not-sr-only">Send</span>
+                </Button>
+              </div>
             </form>
           </>
         )}

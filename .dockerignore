@@ -1,29 +1,44 @@
-# Node
+# Keep the build context small. Without this, Docker ships node_modules, .next,
+# build output and virtualenvs to the daemon — the context ballooned past 900MB
+# and every layer hash changed on unrelated edits.
 **/node_modules
 **/.next
 **/dist
+**/out
+**/build
 **/coverage
-**/*.tsbuildinfo
+**/.turbo
+**/.cache
 
-# Python
-ai-service/.venv/
-**/__pycache__/
-**/*.pyc
-ai-service/.pytest_cache/
-
-# Env / secrets
+# Local env and secrets must never enter an image layer.
 **/.env
-**/.env.local
+**/.env.*
+!**/.env.example
 
-# Editor & OS
-.idea/
-.vscode/
-.DS_Store
+# Virtualenvs, Python caches and tooling
+**/.venv
+**/venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
 
-# Git
-.git/
+# VCS and CI
+.git
+.github
+.gitignore
 
-# Playwright / smoke scratch
-**/test-results/
-**/playwright-report/
-**/blob-report/
+# Docs and local scratch
+documentation
+**/*.md
+!README.md
+**/*.log
+.vscode
+.idea
+
+# Container and orchestration files
+Dockerfile
+**/Dockerfile
+.dockerignore
+compose*.yaml
