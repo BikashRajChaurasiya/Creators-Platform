@@ -101,7 +101,7 @@ function Users({ session }: { session: Session }) {
                     </select>
                   </td>
                   <td className="px-4 py-3">
-                    <Badge color={statusColor(u.status)}>{u.status}</Badge>
+                    <Badge tone={statusColor(u.status)}>{u.status}</Badge>
                   </td>
                   <td className="px-4 py-3 text-xs text-neutral-400">{new Date(u.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
@@ -110,9 +110,13 @@ function Users({ session }: { session: Session }) {
                         <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => setStatus(u, 'SUSPENDED')} disabled={action === u.id + 'SUSPENDED'}>
                           Suspend
                         </Button>
-                      ) : u.status === 'SUSPENDED' ? (
+                      ) : u.status === 'PENDING' || u.status === 'SUSPENDED' ? (
                         <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => setStatus(u, 'ACTIVE')} disabled={action === u.id + 'ACTIVE'}>
                           Activate
+                        </Button>
+                      ) : u.status === 'BANNED' ? (
+                        <Button variant="outline" className="px-3 py-1 text-xs" onClick={() => setStatus(u, 'ACTIVE')} disabled={action === u.id + 'ACTIVE'}>
+                          Reinstate
                         </Button>
                       ) : (
                         <span className="text-xs text-neutral-400">n/a</span>

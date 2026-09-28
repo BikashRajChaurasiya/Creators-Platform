@@ -105,7 +105,7 @@ function BrandProfileForm({ session, profile }: { session: Session; profile: Bra
           <h1 className="text-xl font-bold text-neutral-900">Brand profile</h1>
           <p className="text-sm text-neutral-500">Make sure your company looks trustworthy to creators.</p>
         </div>
-        <Badge color={verified === 'VERIFIED' ? 'green' : verified === 'PENDING' ? 'amber' : 'gray'}>
+        <Badge tone={verified === 'VERIFIED' ? 'green' : verified === 'PENDING' ? 'amber' : 'gray'}>
           {verified ?? 'UNVERIFIED'}
         </Badge>
       </div>

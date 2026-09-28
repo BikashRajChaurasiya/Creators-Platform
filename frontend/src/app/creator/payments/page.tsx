@@ -47,7 +47,7 @@ function stepIndex(status: string): number {
 function PayoutStepper({ status }: { status: string }) {
   const idx = stepIndex(status);
   if (idx < 0) {
-    return <Badge color={statusColor(status)}>{status}</Badge>;
+    return <Badge tone={statusColor(status)}>{status}</Badge>;
   }
   return (
     <div className="flex items-center gap-1">

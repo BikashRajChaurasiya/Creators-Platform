@@ -49,7 +49,7 @@ function AdminCampaigns({ session }: { session: Session }) {
                   <td className="px-4 py-3 text-neutral-600">{c.brand?.companyName ?? '—'}</td>
                   <td className="px-4 py-3 tabular-nums">{CURRENCY(c.budgetMin)} – {CURRENCY(c.budgetMax)}</td>
                   <td className="px-4 py-3">
-                    <Badge color={statusColor(c.status)}>{c.status}</Badge>
+                    <Badge tone={statusColor(c.status)}>{c.status}</Badge>
                   </td>
                   <td className="px-4 py-3 text-xs text-neutral-400">{new Date(c.createdAt).toLocaleDateString()}</td>
                 </tr>

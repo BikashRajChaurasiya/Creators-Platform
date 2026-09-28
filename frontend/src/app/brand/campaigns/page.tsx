@@ -255,7 +255,7 @@ function BrandCampaigns({ session }: { session: Session }) {
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <Badge color={statusColor(c.status)}>{c.status}</Badge>
+                  <Badge tone={statusColor(c.status)}>{c.status}</Badge>
                   <div className="flex gap-1.5">
                     {c.status === 'DRAFT' && (
                       <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === c.id} onClick={() => changeState(c, 'RECRUITING')}>

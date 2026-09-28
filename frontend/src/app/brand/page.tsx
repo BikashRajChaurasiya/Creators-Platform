@@ -67,7 +67,7 @@ function BrandDash({ session }: { session: Session }) {
             <p className="mt-1 text-sm text-white/80">{profile.data?.industry ?? 'Your brand'}</p>
           </div>
           {profile.data && (
-            <Badge color={statusColor(profile.data.verificationStatus ?? (profile.data.verified ? 'VERIFIED' : 'PENDING'))}>
+            <Badge tone={statusColor(profile.data.verificationStatus ?? (profile.data.verified ? 'VERIFIED' : 'PENDING'))}>
               {profile.data.verificationStatus ?? (profile.data.verified ? 'VERIFIED' : 'PENDING')}
             </Badge>
           )}
@@ -114,7 +114,7 @@ function BrandDash({ session }: { session: Session }) {
                     {CURRENCY(c.budgetMin)} – {CURRENCY(c.budgetMax)}
                   </p>
                 </div>
-                <Badge color={statusColor(c.status)}>{c.status}</Badge>
+                <Badge tone={statusColor(c.status)}>{c.status}</Badge>
               </li>
             ))}
           </ul>

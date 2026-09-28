@@ -85,7 +85,7 @@ function ReceivedApps({ session }: { session: Session }) {
                   <p className="mt-2 line-clamp-3 text-sm text-neutral-600">{a.pitch}</p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
-                  <Badge color={statusColor(a.status)}>{a.status}</Badge>
+                  <Badge tone={statusColor(a.status)}>{a.status}</Badge>
                   {a.status === 'PENDING' && (
                     <div className="flex gap-1.5">
                       <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === a.id} onClick={() => review(a, 'SHORTLISTED')}>

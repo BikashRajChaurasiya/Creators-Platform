@@ -37,7 +37,7 @@ interface PaymentRow {
 
 function Finance({ session }: { session: Session }) {
   const finance = useApi<FinanceOverview>('/admin/finance', session.tokens.accessToken);
-  const payments = useApi<PaymentRow[]>('/payments?scope=all&limit=100', session.tokens.accessToken);
+  const payments = useApi<PaymentRow[]>('/payments?scope=all&limit=50', session.tokens.accessToken);
   const [busyId, setBusyId] = useState<string | null>(null);
   const toast = useToast();
 
@@ -162,7 +162,7 @@ function Finance({ session }: { session: Session }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge color={statusColor(p.status)}>{p.status}</Badge>
+                  <Badge tone={statusColor(p.status)}>{p.status}</Badge>
                   {p.status === 'PENDING' && (
                     <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === p.id || !canApprove(p)} onClick={() => act(p.id, 'approve')}>
                       {me === p.preparedById ? 'Prepared by you' : busyId === p.id ? '…' : 'Approve'}

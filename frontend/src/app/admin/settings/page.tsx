@@ -128,11 +128,14 @@ function SettingsPage({ session }: { session: Session }) {
       <Card>
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-neutral-500">Financial configuration</h2>
         <p className="mb-3 text-xs text-neutral-500">Fee, VAT and TDS percentages applied to payouts. Verify against current Nepal tax guidance before launch.</p>
-        <form className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* A <div>, not a <form>: with no onSubmit and no submit button, pressing
+            Enter in a percentage input triggers implicit form submission, which
+            navigates and discards every unsaved edit on the page. */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Input label="Commission percent" type="number" min={0} max={60} value={form.commissionPercent} onChange={(e) => set('commissionPercent', Number(e.target.value))} />
           <Input label="VAT percent" type="number" min={0} max={30} value={form.vatPercent} onChange={(e) => set('vatPercent', Number(e.target.value))} />
           <Input label="TDS percent" type="number" min={0} max={40} value={form.tdsPercent} onChange={(e) => set('tdsPercent', Number(e.target.value))} />
-        </form>
+        </div>
       </Card>
 
       <Card>

@@ -87,12 +87,11 @@ function BrandPayments({ session }: { session: Session }) {
         token: session.tokens.accessToken,
         body: { creatorId: app.creator.user.id, campaignId: app.campaign.id, amount: value },
       });
-      toast.success(`Payout of ${CURRENCY(value)} prepared for approval.`);
       setSel('');
       setAmount('');
       payments.reload();
       invoices.reload();
-      toast.success(`Payment ${p.id.slice(0, 8)}… recorded.`);
+      toast.success(`Payment ${p.id.slice(0, 8)}… prepared for approval.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not create the payout.');
     } finally {
@@ -191,7 +190,7 @@ function BrandPayments({ session }: { session: Session }) {
                       {p.channel ? ` · ${p.channel.replace(/_/g, ' ')}` : ''}
                     </p>
                   </div>
-                  <Badge color={statusColor(p.status)}>{p.status}</Badge>
+                  <Badge tone={statusColor(p.status)}>{p.status}</Badge>
                 </li>
               ))}
             </ul>
@@ -219,7 +218,7 @@ function BrandPayments({ session }: { session: Session }) {
                       {CURRENCY(inv.amount)} · fee {CURRENCY(inv.commissionAmount)} · bill date {new Date(inv.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <Badge color={statusColor(inv.status)}>{inv.status === 'OVERDUE' ? 'OVERDUE' : inv.status}</Badge>
+                  <Badge tone={statusColor(inv.status)}>{inv.status === 'OVERDUE' ? 'OVERDUE' : inv.status}</Badge>
                 </li>
               ))}
             </ul>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Area,
   AreaChart,
@@ -84,7 +84,12 @@ function daysAgoISO(n: number) {
 
 function Analytics({ session }: { session: Session }) {
   const [days, setDays] = useState(30);
-  const from = daysAgoISO(days);
+  // `from` feeds the useApi path, which is an effect dependency. Recomputing it
+  // with Date.now() on every render produces a new path every render, which
+  // re-triggers the fetch, which re-renders — an unbounded request loop against
+  // an endpoint that runs ~13 queries. Memoise on `days` so the string is
+  // stable for a given selection.
+  const from = useMemo(() => daysAgoISO(days), [days]);
   const report = useApi<PlatformReport>(`/analytics/platform?from=${encodeURIComponent(from)}`, session.tokens.accessToken, [days]);
   const series = useApi<SeriesData>(`/analytics/platform/series?from=${encodeURIComponent(from)}`, session.tokens.accessToken, [days]);
 

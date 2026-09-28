@@ -5,8 +5,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   BarChart3,
   Briefcase,
+  CircleUser,
   Compass,
   FileText,
+  Landmark,
   LayoutDashboard,
   Megaphone,
   MessageSquare,
@@ -46,6 +48,10 @@ const NAV_ICONS: Record<string, LucideIcon> = {
   Users: Users,
   Settings: Settings,
   'Audit log': ScrollText,
+  // Without these, `iconFor` falls back to LayoutDashboard and the sidebar
+  // shows the same glyph twice.
+  Finance: Landmark,
+  Profile: CircleUser,
 };
 
 function iconFor(item: NavItem): LucideIcon {

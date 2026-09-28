@@ -102,7 +102,7 @@ function Dash({ session }: { session: Session }) {
                   <p className="font-medium">{c.title}</p>
                   <p className="text-xs text-neutral-400">{CURRENCY(c.budgetMin)} – {CURRENCY(c.budgetMax)}</p>
                 </div>
-                <Badge color={statusColor(c.status)}>{c.status}</Badge>
+                <Badge tone={statusColor(c.status)}>{c.status}</Badge>
               </li>
             ))}
           </ul>

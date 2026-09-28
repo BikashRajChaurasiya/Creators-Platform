@@ -47,6 +47,40 @@ function toText(v: string[] | undefined | null): string {
   return (v ?? []).join(', ');
 }
 
+/**
+ * Defined at module scope on purpose. Declared inside the form component it got
+ * a new function identity on every render, so React unmounted and remounted the
+ * <select> on every keystroke anywhere in the form, losing focus and any open
+ * dropdown state.
+ */
+function PayoutSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-sm font-medium text-neutral-600">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary-soft"
+      >
+        <option value="">Not set</option>
+        {PAYOUT_CHANNELS.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function CreatorProfileForm({ session, profile }: { session: Session; profile: CreatorProfile }) {
   const [form, setForm] = useState({
     username: profile.user?.username ?? '',
@@ -123,24 +157,6 @@ function CreatorProfileForm({ session, profile }: { session: Session; profile: C
       setSaving(false);
     }
   }
-
-  const PayoutSelect = ({ field, label }: { field: 'payoutChannel' | 'fallbackChannel'; label: string }) => (
-    <label className="block">
-      <span className="mb-1 block text-sm font-medium text-neutral-600">{label}</span>
-      <select
-        value={form[field]}
-        onChange={(e) => set(field, e.target.value)}
-        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-2 focus:ring-primary-soft"
-      >
-        <option value="">Not set</option>
-        {PAYOUT_CHANNELS.map((c) => (
-          <option key={c} value={c}>
-            {c}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
@@ -242,14 +258,22 @@ function CreatorProfileForm({ session, profile }: { session: Session; profile: C
         <h2 className="mb-1 font-semibold">Payout details</h2>
         <p className="mb-4 text-xs text-neutral-400">Where would you like to receive verified payouts?</p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <PayoutSelect field="payoutChannel" label="Primary channel" />
+          <PayoutSelect
+            label="Primary channel"
+            value={form.payoutChannel}
+            onChange={(v) => set('payoutChannel', v)}
+          />
           <Input
             label="Channel detail"
             value={form.payoutChannelDetail}
             onChange={(e) => set('payoutChannelDetail', e.target.value)}
             placeholder="eSewa ID / Khalti ID / IME Pay ID / Account no."
           />
-          <PayoutSelect field="fallbackChannel" label="Fallback channel" />
+          <PayoutSelect
+            label="Fallback channel"
+            value={form.fallbackChannel}
+            onChange={(v) => set('fallbackChannel', v)}
+          />
           <Input
             label="Fallback detail"
             value={form.fallbackChannelDetail}

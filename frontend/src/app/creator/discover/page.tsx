@@ -14,12 +14,21 @@ interface Campaign {
   id: string;
   title: string;
   description: string;
-  category: string;
   budgetMin: number;
   budgetMax: number;
   status: string;
   deadline: string | null;
   brand: { companyName: string };
+  /**
+   * `Campaign` has no `category` column (see prisma/schema.prisma). Categories
+   * are stored inside the `creatorRequirements` JSON, so reading a top-level
+   * `category` yields undefined and any `.toLowerCase()` on it throws.
+   */
+  creatorRequirements?: { categories?: string[] } | null;
+}
+
+function campaignCategory(c: Campaign): string {
+  return c.creatorRequirements?.categories?.[0] ?? 'general';
 }
 
 function Discover({ session }: { session: Session }) {
@@ -34,7 +43,7 @@ function Discover({ session }: { session: Session }) {
         method: 'POST',
         token: session.tokens.accessToken,
         body: {
-          pitch: `I would love to collaborate on "${c.title}". I create authentic content in ${c.category.toLowerCase()} with strong local engagement.`,
+          pitch: `I would love to collaborate on "${c.title}". I create authentic content in ${campaignCategory(c).toLowerCase()} with strong local engagement.`,
         },
       });
       toast.success(`Applied! Your application is now ${res.status.toLowerCase()}.`);
@@ -69,7 +78,7 @@ function Discover({ session }: { session: Session }) {
                   <p className="font-semibold">{c.title}</p>
                   <p className="text-xs text-neutral-400">{c.brand?.companyName ?? 'Brand'}</p>
                 </div>
-                <Badge color={statusColor(c.status)}>{c.status}</Badge>
+                <Badge tone={statusColor(c.status)}>{c.status}</Badge>
               </div>
               <p className="mt-2 line-clamp-3 flex-1 text-sm text-neutral-600">{c.description}</p>
               <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
@@ -77,7 +86,7 @@ function Discover({ session }: { session: Session }) {
                   {CURRENCY(c.budgetMin)} – {CURRENCY(c.budgetMax)}
                 </span>
                 <span className="inline-flex items-center gap-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
-                  {c.category}
+                  {campaignCategory(c)}
                 </span>
                 {c.deadline && (
                   <span className="text-xs text-neutral-400">Due {new Date(c.deadline).toLocaleDateString()}</span>

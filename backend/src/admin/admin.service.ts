@@ -242,7 +242,10 @@ export class AdminService {
       }),
       maintenanceMode: get('maintenanceMode', false),
       signupsOpen: get('signupsOpen', true),
-      emailFrom: get('emailFrom', 'UGCNP <no-reply@ugcnp.com>'),
+      // Must be a bare address: the PUT DTO validates this as `z.string().email()`,
+      // so a display-name form like "UGCNP <no-reply@ugcnp.com>" would be
+      // pre-filled into the admin form and then rejected on every save (400).
+      emailFrom: get('emailFrom', 'no-reply@ugcnp.com'),
     };
   }
 
@@ -290,7 +293,10 @@ export class AdminService {
   }
 
   async reportsSummary(actor: JwtUser) {
-    await this.audit.log({ actor, action: 'reports.summary' });
+    // A dashboard load is a read. Logging it here wrote a `reports.summary` row
+    // on every page load, which flooded the audit log with non-actions and hid
+    // the real entries.
+    void actor;
     const [users, creators, brands, campaigns, pendingApps, submissions, revenue, disputes, tasks] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.creatorProfile.count(),

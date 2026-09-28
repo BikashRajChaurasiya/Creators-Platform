@@ -24,7 +24,14 @@ export class BrandService {
     const brand = await this.ensureBrand(userId);
     const result = await this.prisma.brand.findUnique({
       where: { id: brand.id },
-      include: { campaigns: { select: { id: true, title: true, status: true, budgetMin: true, budgetMax: true } } },
+      include: {
+        // The brand profile page renders the logo and display name from
+        // `profile.user`, so the relation has to be loaded here. Without it
+        // `profile.user` is always undefined and the Avatar silently falls
+        // back to initials even though a logo was uploaded.
+        user: { select: { id: true, name: true, username: true, avatarUrl: true } },
+        campaigns: { select: { id: true, title: true, status: true, budgetMin: true, budgetMax: true } },
+      },
     });
     return { ...result, campaignCount: result?.campaigns.length ?? 0 };
   }
