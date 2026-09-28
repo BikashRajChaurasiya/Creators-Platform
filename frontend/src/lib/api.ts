@@ -48,6 +48,38 @@ export function setRefreshToken(token: string | null) {
   refreshTokenStore = token;
 }
 
+/**
+ * A non-JSON body is a real and common case here: the Vercel `/api/*` proxy
+ * replies with an HTML page when the backend service is unreachable or throws,
+ * and it returns plain text for some platform-level errors. Parsing that
+ * unguarded produces "unexpected character at line 1 column 1" and throws away
+ * the status code, content-type and body that actually explain the failure.
+ */
+function safeJsonParse(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+function toApiError(res: Response, text: string): ApiError {
+  const parsed = safeJsonParse(text);
+  if (parsed && typeof parsed === 'object') {
+    return new ApiError({ statusCode: res.status, ...(parsed as object) } as ApiErrorPayload);
+  }
+
+  const contentType = res.headers.get('content-type') ?? 'no content-type';
+  const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 200);
+
+  return new ApiError({
+    statusCode: res.status,
+    message: snippet
+      ? `Non-JSON response from ${res.url || 'the API'} — ${res.status} ${res.statusText}, ${contentType}. Body: ${snippet}`
+      : `Empty response from ${res.url || 'the API'} — ${res.status} ${res.statusText}, ${contentType}.`,
+  });
+}
+
 export async function apiRequest<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, token, signal } = options;
   const url = path.startsWith('http') ? path : `${API_BASE}${path}`;
@@ -76,11 +108,12 @@ export async function apiRequest<T = unknown>(path: string, options: RequestOpti
   }
 
   const text = await res.text();
-  const json = text ? JSON.parse(text) : {};
 
   if (!res.ok) {
-    throw new ApiError({ ...json });
+    throw toApiError(res, text);
   }
+
+  const json = text ? safeJsonParse(text) : {};
 
   if (options.raw) {
     return json as T;
@@ -95,8 +128,13 @@ export async function refreshTokens(): Promise<string> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: refreshTokenStore }),
   });
-  const json = (await res.json()) as { data?: RefreshResponse };
-  if (!res.ok || !json.data) {
+  const text = await res.text();
+  if (!res.ok) {
+    throw toApiError(res, text);
+  }
+
+  const json = safeJsonParse(text) as { data?: RefreshResponse } | undefined;
+  if (!json?.data) {
     throw new ApiError({ statusCode: 401, message: 'Refresh failed' });
   }
   if (typeof window !== 'undefined') {
