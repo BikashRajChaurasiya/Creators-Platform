@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { isValidElement, useEffect, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Card } from './card';
 
@@ -67,13 +67,39 @@ export interface StatCardProps {
   className?: string;
 }
 
+/**
+ * Tells a component *type* apart from an already-rendered node.
+ *
+ * A `typeof value === 'function'` test is not enough: lucide icons are
+ * `forwardRef` objects (`{$$typeof, render, displayName}`), so they fail that
+ * test and get returned as-is, which is exactly React error #31 ("Objects are
+ * not valid as a React child").
+ *
+ * `React.isValidElementType` would express this directly, but React 19 dropped
+ * it from the public `react` export (only `isValidElement` remains), so the
+ * check is done here. Every component type is either a function or an object
+ * tagged with a `$$typeof` symbol.
+ */
+function isComponentType(value: unknown): boolean {
+  if (typeof value === 'function') return true;
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { $$typeof?: unknown }).$$typeof === 'symbol'
+  );
+}
+
 function renderIcon(icon: StatCardProps['icon'], className: string): React.ReactNode {
   if (!icon) return null;
-  if (typeof icon === 'function') {
+  // A rendered element is also an object carrying a `$$typeof` symbol, so it
+  // must be rejected before the component-type test below, otherwise passing
+  // `icon={<Users />}` would try to mount the element itself.
+  if (isValidElement(icon)) return icon;
+  if (isComponentType(icon)) {
     const Icon = icon as React.ComponentType<{ className?: string }>;
     return <Icon className={className} />;
   }
-  return icon;
+  return icon as React.ReactNode;
 }
 
 export function StatCard({ label, value, sub, icon, tint = 'primary', className }: StatCardProps) {
