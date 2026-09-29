@@ -5,8 +5,9 @@ import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV, CURRENCY, statusColor } from '@/lib/ui';
 import { ApiError, apiRequest } from '@/lib/api';
-import { Badge, Button, Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, StatCard , Pagination} from '@/components/ui';
+import { useApi, useApiPage } from '@/lib/use-api';
+import { invalidateApiCache } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
 
@@ -36,8 +37,9 @@ interface PaymentRow {
 }
 
 function Finance({ session }: { session: Session }) {
+  const [page, setPage] = useState(1);
   const finance = useApi<FinanceOverview>('/admin/finance', session.tokens.accessToken);
-  const payments = useApi<PaymentRow[]>('/payments?scope=all&limit=50', session.tokens.accessToken);
+  const payments = useApiPage<PaymentRow[]>(`/payments?scope=all&limit=50&page=${page}`, session.tokens.accessToken);
   const [busyId, setBusyId] = useState<string | null>(null);
   const toast = useToast();
 
@@ -54,6 +56,7 @@ function Finance({ session }: { session: Session }) {
         body: action === 'release' ? {} : undefined,
       });
       toast.success(action === 'approve' ? 'Payment approved.' : 'Payment released.');
+      invalidateApiCache(['/payments', '/admin/finance']);
       finance.reload();
       payments.reload();
     } catch (err) {
@@ -81,7 +84,7 @@ function Finance({ session }: { session: Session }) {
           <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
         </div>
       ) : finance.error ? (
-        <EmptyState message={finance.error} />
+        <ErrorState error={finance.error} onRetry={finance.reload} />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -150,8 +153,9 @@ function Finance({ session }: { session: Session }) {
         {payments.loading ? (
           <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
         ) : payments.error ? (
-          <EmptyState message={payments.error} />
+          <ErrorState error={payments.error} onRetry={payments.reload} />
         ) : queue.length > 0 ? (
+          <>
           <ul className="divide-y divide-neutral-100">
             {queue.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -177,6 +181,8 @@ function Finance({ session }: { session: Session }) {
               </li>
             ))}
           </ul>
+          <Pagination page={page} pageCount={payments.meta?.totalPages ?? 1} onPageChange={setPage} />
+          </>
         ) : (
           <EmptyState title="Queue clear" message="No payments awaiting approval or release." />
         )}

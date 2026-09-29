@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Card, EmptyState, SkeletonCard } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Badge, Card, EmptyState, ErrorState, SkeletonCard, Pagination } from '@/components/ui';
+import { useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
 interface CampaignRow {
@@ -18,7 +20,8 @@ interface CampaignRow {
 }
 
 function AdminCampaigns({ session }: { session: Session }) {
-  const { data, loading, error } = useApi<CampaignRow[]>('/admin/campaigns?limit=50', session.tokens.accessToken);
+  const [page, setPage] = useState(1);
+  const { data, meta, loading, error, reload } = useApiPage<CampaignRow[]>(`/admin/campaigns?limit=50&page=${page}`, session.tokens.accessToken);
 
   return (
     <div className="flex flex-col gap-4">
@@ -29,9 +32,10 @@ function AdminCampaigns({ session }: { session: Session }) {
       {loading ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
       ) : error ? (
-        <EmptyState message={error} />
+        <ErrorState error={error} onRetry={reload} />
       ) : data && data.length > 0 ? (
-        <Card className="overflow-x-auto p-0">
+        <>
+          <Card className="overflow-x-auto p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-400">
@@ -56,7 +60,9 @@ function AdminCampaigns({ session }: { session: Session }) {
               ))}
             </tbody>
           </table>
-        </Card>
+          </Card>
+          <Pagination page={page} pageCount={meta?.totalPages ?? 1} onPageChange={setPage} />
+        </>
       ) : (
         <EmptyState title="No campaigns found" />
       )}

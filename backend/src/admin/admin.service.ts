@@ -117,7 +117,9 @@ export class AdminService {
       }),
       this.prisma.task.count({ where }),
     ]);
-    return { data: items, meta: { page: query.page ?? 1, limit: query.limit ?? 20, total, totalPages: Math.ceil(total / (query.limit ?? 20)), hasNext: false, hasPrevious: false } };
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    return { data: items, meta: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrevious: page > 1 } };
   }
 
   async createTask(actor: JwtUser, input: { title: string; description?: string; assigneeId?: string; campaignId?: string; priority?: string; dueDate?: string; type?: string }) {

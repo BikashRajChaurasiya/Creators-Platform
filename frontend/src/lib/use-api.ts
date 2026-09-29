@@ -1,13 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, apiRequestPage, type PageMeta } from '@/lib/api';
 
 interface ApiState<T> {
   data: T | null;
   error: string | null;
   loading: boolean;
   reload: () => void;
+}
+
+interface PaginatedApiState<T> extends ApiState<T> {
+  /** Null when the endpoint is not paginated. */
+  meta: PageMeta | null;
 }
 
 /**
@@ -23,11 +28,37 @@ interface ApiState<T> {
  * date range). Pass a stable-length array to avoid effect churn.
  */
 export function useApi<T>(path: string, token: string | null, deps: readonly unknown[] = []): ApiState<T> {
+  return useApiInternal<T>(path, token, deps, false);
+}
+
+/**
+ * `useApi` for list endpoints, additionally exposing the `meta` the backend
+ * sends next to `data`. Pass `page`/`limit` through `path` (or `deps`) and feed
+ * `meta` to `<Pagination />`.
+ */
+export function useApiPage<T>(
+  path: string,
+  token: string | null,
+  deps: readonly unknown[] = [],
+): PaginatedApiState<T> {
+  return useApiInternal<T>(path, token, deps, true);
+}
+
+function useApiInternal<T>(
+  path: string,
+  token: string | null,
+  deps: readonly unknown[],
+  paginated: boolean,
+): PaginatedApiState<T> {
   const [data, setData] = useState<T | null>(null);
+  const [meta, setMeta] = useState<PageMeta | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [reloadKey, setReloadKey] = useState(0);
   const depsKey = JSON.stringify(deps ?? []);
+  // Trimmed so the cache key and the request URL agree even if the caller's
+  // template literal has stray whitespace.
+  const requestPath = path.trim();
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
@@ -37,10 +68,11 @@ export function useApi<T>(path: string, token: string | null, deps: readonly unk
       return;
     }
 
-    const key = cacheKey(path, token, depsKey);
-    const cached = reloadKey === 0 ? cacheGet<T>(key) : undefined;
+    const key = cacheKey(requestPath, token, depsKey);
+    const cached = reloadKey === 0 ? cacheGet<CachedValue<T>>(key) : undefined;
     if (cached !== undefined) {
-      setData(cached);
+      setData(cached.data);
+      setMeta(cached.meta);
       setError(null);
       setLoading(false);
       return;
@@ -50,12 +82,20 @@ export function useApi<T>(path: string, token: string | null, deps: readonly unk
     let cancelled = false;
     setLoading(true);
 
-    apiRequest<T>(path, { token, signal: controller.signal })
-      .then((d) => {
+    const request = paginated
+      ? apiRequestPage<T>(requestPath, { token, signal: controller.signal }).then((r) => ({
+          data: r.data,
+          meta: r.meta,
+        }))
+      : apiRequest<T>(requestPath, { token, signal: controller.signal }).then((d) => ({ data: d, meta: null }));
+
+    request
+      .then((r) => {
         if (cancelled) return;
-        setData(d);
+        setData(r.data);
+        setMeta(r.meta);
         setError(null);
-        cacheSet(key, d);
+        cacheSet(key, r);
       })
       .catch((e: Error) => {
         if (cancelled || e.name === 'AbortError') return;
@@ -69,12 +109,19 @@ export function useApi<T>(path: string, token: string | null, deps: readonly unk
       cancelled = true;
       controller.abort();
     };
-  }, [token, path, reloadKey, depsKey]);
+  }, [token, requestPath, reloadKey, depsKey, paginated]);
 
-  return { data, error, loading, reload };
+  return { data, meta, error, loading, reload };
+}
+
+/** Cache payloads are uniform so a non-paginated read is cache-compatible too. */
+interface CachedValue<T> {
+  data: T;
+  meta: PageMeta | null;
 }
 
 interface CacheEntry {
+  path: string;
   value: unknown;
   expiresAt: number;
 }
@@ -116,10 +163,31 @@ function cacheSet(key: string, value: unknown) {
       if (!oldest.done) CACHE.delete(oldest.value);
     }
   }
-  CACHE.set(key, { value, expiresAt: Date.now() + CACHE_TTL_MS });
+  const path = key.slice(key.indexOf(':') + 1).split('?')[0];
+  CACHE.set(key, { path, value, expiresAt: Date.now() + CACHE_TTL_MS });
 }
 
-/** Drops every cached GET response. Call after a mutation invalidates a screen. */
-export function invalidateApiCache() {
-  CACHE.clear();
+/**
+ * Drops cached GET responses so the next mount refetches.
+ *
+ * With no argument every entry is cleared. Pass path prefixes to scope the
+ * drop, e.g. `invalidateApiCache(['/admin/users', '/admin/finance'])` after
+ * changing a user's status, which otherwise leaves those lists showing stale
+ * data for up to the 30s TTL.
+ */
+export function invalidateApiCache(prefixes?: string | string[]) {
+  if (!prefixes) {
+    CACHE.clear();
+    return;
+  }
+  const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+  if (list.length === 0) {
+    CACHE.clear();
+    return;
+  }
+  for (const [key, entry] of CACHE) {
+    if (list.some((p) => entry.path === p || entry.path.startsWith(p))) {
+      CACHE.delete(key);
+    }
+  }
 }

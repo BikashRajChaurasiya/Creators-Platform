@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Button, Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, StatCard , Pagination} from '@/components/ui';
+import { useApi, useApiPage } from '@/lib/use-api';
 import { apiRequest } from '@/lib/api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
@@ -54,9 +54,13 @@ interface AcceptedApp {
 }
 
 function BrandPayments({ session }: { session: Session }) {
+  const [page, setPage] = useState(1);
+  const [invoicePage, setInvoicePage] = useState(1);
   const summary = useApi<Summary>('/payments/summary', session.tokens.accessToken);
-  const payments = useApi<PaymentRow[]>('/payments?scope=outgoing&limit=50', session.tokens.accessToken);
-  const invoices = useApi<InvoiceRow[]>('/payments/invoices?limit=50', session.tokens.accessToken);
+  const payments = useApiPage<PaymentRow[]>(`/payments?scope=outgoing&limit=50&page=${page}`, session.tokens.accessToken);
+  const invoices = useApiPage<InvoiceRow[]>(`/payments/invoices?limit=50&page=${invoicePage}`, session.tokens.accessToken);
+  // Feeds the "accepted creator" dropdown, not a table: a dropdown with 50
+  // options is already awkward, so it stays unpaginated.
   const apps = useApi<AcceptedApp[]>('/applications?scope=received&limit=50', session.tokens.accessToken);
   const toast = useToast();
 
@@ -114,7 +118,7 @@ function BrandPayments({ session }: { session: Session }) {
           <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
         </div>
       ) : summary.error ? (
-        <EmptyState message={summary.error} />
+        <ErrorState error={summary.error} onRetry={summary.reload} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="Total billed" value={CURRENCY(s?.totalBilled ?? 0)} icon="🧾" tint="primary" sub={`${s?.invoiceCount ?? 0} invoices`} />
@@ -178,8 +182,9 @@ function BrandPayments({ session }: { session: Session }) {
           {payments.loading ? (
             <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
           ) : payments.error ? (
-            <EmptyState message={payments.error} />
+            <ErrorState error={payments.error} onRetry={payments.reload} />
           ) : rows.length > 0 ? (
+            <>
             <ul className="divide-y divide-neutral-100">
               {rows.map((p) => (
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
@@ -194,6 +199,8 @@ function BrandPayments({ session }: { session: Session }) {
                 </li>
               ))}
             </ul>
+            <Pagination page={page} pageCount={payments.meta?.totalPages ?? 1} onPageChange={setPage} />
+            </>
           ) : (
             <EmptyState title="No transactions yet" message="Payments you initiate will appear here with their status." />
           )}
@@ -207,8 +214,9 @@ function BrandPayments({ session }: { session: Session }) {
           {invoices.loading ? (
             <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
           ) : invoices.error ? (
-            <EmptyState message={invoices.error} />
+            <ErrorState error={invoices.error} onRetry={invoices.reload} />
           ) : invoiceRows.length > 0 ? (
+            <>
             <ul className="divide-y divide-neutral-100">
               {invoiceRows.map((inv) => (
                 <li key={inv.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
@@ -222,6 +230,8 @@ function BrandPayments({ session }: { session: Session }) {
                 </li>
               ))}
             </ul>
+            <Pagination page={invoicePage} pageCount={invoices.meta?.totalPages ?? 1} onPageChange={setInvoicePage} />
+            </>
           ) : (
             <EmptyState title="No invoices yet" message="Preparing a payout generates the matching invoice automatically." />
           )}

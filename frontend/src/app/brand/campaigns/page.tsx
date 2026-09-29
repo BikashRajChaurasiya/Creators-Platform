@@ -5,8 +5,8 @@ import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, CURRENCY, statusColor } from '@/lib/ui';
 import { ApiError, apiRequest } from '@/lib/api';
-import { Alert, Badge, Button, Card, EmptyState, Input, Select, SkeletonCard, TextArea } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Alert, Badge, Button, Card, EmptyState, ErrorState, Input, Select, SkeletonCard, TextArea, Pagination } from '@/components/ui';
+import { useApi, useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
 
@@ -45,7 +45,8 @@ const OBJECTIVES = ['BRAND_AWARENESS', 'PRODUCT_LAUNCH', 'SALES_CONVERSION', 'EN
 const DELIVERABLES = ['REEL', 'SHORT', 'PHOTO_CAROUSEL', 'SINGLE_PHOTO', 'STORY', 'YOUTUBE_VIDEO', 'TIKTOK', 'FACEBOOK_POST'] as const;
 
 function BrandCampaigns({ session }: { session: Session }) {
-  const { data, loading, error, reload } = useApi<CampaignRow[]>('/campaigns/mine?limit=50', session.tokens.accessToken);
+  const [page, setPage] = useState(1);
+  const { data, meta, loading, error, reload } = useApiPage<CampaignRow[]>(`/campaigns/mine?limit=50&page=${page}`, session.tokens.accessToken);
   const summary = useApi<BrandSummary>('/payments/summary', session.tokens.accessToken);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -241,7 +242,7 @@ function BrandCampaigns({ session }: { session: Session }) {
       {loading ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
       ) : error ? (
-        <EmptyState message={error} />
+        <ErrorState error={error} onRetry={reload} />
       ) : data && data.length > 0 ? (
         <div className="flex flex-col gap-3">
           {data.map((c) => (
@@ -272,6 +273,7 @@ function BrandCampaigns({ session }: { session: Session }) {
               </div>
             </Card>
           ))}
+        <Pagination page={page} pageCount={meta?.totalPages ?? 1} onPageChange={setPage} />
         </div>
       ) : (
         <EmptyState

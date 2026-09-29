@@ -3,6 +3,7 @@
 import { AlertCircle, CheckCircle2, Info, Inbox, TriangleAlert } from 'lucide-react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/cn';
+import { Button } from './button';
 import { Card } from './card';
 
 export const alertVariants = cva('flex items-start gap-3 rounded-lg border p-3 text-sm', {
@@ -61,7 +62,6 @@ export interface EmptyStateProps {
   action?: React.ReactNode;
   className?: string;
 }
-
 export function EmptyState({
   title,
   message,
@@ -91,5 +91,38 @@ export function EmptyState({
       {message && <p className="max-w-sm text-sm text-fg-muted">{message}</p>}
       {action && <div className="mt-2">{action}</div>}
     </Card>
+  );
+}
+
+/**
+ * Failure state for a failed read, distinct from `EmptyState`'s "nothing here
+ * yet". Always offers a retry, and prefers the server's own wording over a
+ * generic headline so a 400 or 403 explains itself.
+ */
+export function ErrorState({
+  error,
+  onRetry,
+  title,
+  className,
+}: {
+  error: string;
+  onRetry?: () => void;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <EmptyState
+      variant="error"
+      title={title ?? 'Could not load this'}
+      message={error}
+      className={className}
+      action={
+        onRetry && (
+          <Button variant="outline" size="sm" onClick={onRetry}>
+            Try again
+          </Button>
+        )
+      }
+    />
   );
 }

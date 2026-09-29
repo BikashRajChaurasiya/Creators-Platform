@@ -29,17 +29,30 @@ export class AuditService {
     });
   }
 
-  list(page = 1, limit = 50, filter?: { action?: string; targetType?: string }) {
-    return this.prisma.auditLog.findMany({
-      where: {
-        action: filter?.action || undefined,
-        targetType: filter?.targetType || undefined,
-      },
-      include: { actor: { select: { id: true, name: true, email: true, role: true } } },
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  /**
+   * Returns the page plus the `meta` every other list endpoint sends. The
+   * previous shape was a bare array, so the audit log silently truncated at
+   * `limit` with no indication that older entries existed.
+   */
+  async list(page = 1, limit = 50, filter?: { action?: string; targetType?: string }) {
+    const where = {
+      action: filter?.action || undefined,
+      targetType: filter?.targetType || undefined,
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        include: { actor: { select: { id: true, name: true, email: true, role: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+    return {
+      data: items,
+      meta: { page, limit, total, totalPages: Math.ceil(total / limit), hasNext: page * limit < total, hasPrevious: page > 1 },
+    };
   }
 
   count(filter?: { action?: string; targetType?: string }) {

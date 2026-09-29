@@ -3,7 +3,7 @@
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV, CURRENCY } from '@/lib/ui';
-import { Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
+import { Card, ErrorState, SkeletonCard, StatCard } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
@@ -43,7 +43,7 @@ function AdminDash({ session }: { session: Session }) {
           <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
         </div>
       ) : rep.error ? (
-        <EmptyState message={rep.error} />
+        <ErrorState error={rep.error} onRetry={rep.reload} />
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

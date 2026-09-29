@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Button, Card, EmptyState, SkeletonCard } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, Pagination } from '@/components/ui';
+import { useApiPage } from '@/lib/use-api';
 import { apiRequest } from '@/lib/api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
@@ -32,7 +32,8 @@ function campaignCategory(c: Campaign): string {
 }
 
 function Discover({ session }: { session: Session }) {
-  const { data, loading, error, reload } = useApi<Campaign[]>('/campaigns/discover?limit=50', session.tokens.accessToken);
+  const [page, setPage] = useState(1);
+  const { data, meta, loading, error, reload } = useApiPage<Campaign[]>(`/campaigns/discover?limit=50&page=${page}`, session.tokens.accessToken);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const toast = useToast();
 
@@ -68,7 +69,7 @@ function Discover({ session }: { session: Session }) {
           ))}
         </div>
       ) : error ? (
-        <EmptyState message={error} />
+        <ErrorState error={error} onRetry={reload} />
       ) : data && data.length > 0 ? (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {data.map((c) => (
@@ -104,6 +105,7 @@ function Discover({ session }: { session: Session }) {
               </div>
             </Card>
           ))}
+        <Pagination page={page} pageCount={meta?.totalPages ?? 1} onPageChange={setPage} />
         </div>
       ) : (
         <EmptyState

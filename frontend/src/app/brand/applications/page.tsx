@@ -5,8 +5,8 @@ import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, statusColor } from '@/lib/ui';
 import { apiRequest } from '@/lib/api';
-import { Badge, Button, Card, EmptyState, SkeletonCard } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, Pagination } from '@/components/ui';
+import { useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
 
@@ -20,7 +20,8 @@ interface AppRow {
 }
 
 function ReceivedApps({ session }: { session: Session }) {
-  const { data, loading, error, reload } = useApi<AppRow[]>('/applications?scope=received&limit=50', session.tokens.accessToken);
+  const [page, setPage] = useState(1);
+  const { data, meta, loading, error, reload } = useApiPage<AppRow[]>(`/applications?scope=received&limit=50&page=${page}`, session.tokens.accessToken);
   const [tab, setTab] = useState('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
   const toast = useToast();
@@ -71,7 +72,7 @@ function ReceivedApps({ session }: { session: Session }) {
       {loading ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
       ) : error ? (
-        <EmptyState message={error} />
+        <ErrorState error={error} onRetry={reload} />
       ) : list.length > 0 ? (
         <div className="flex flex-col gap-3">
           {list.map((a) => (
@@ -103,6 +104,7 @@ function ReceivedApps({ session }: { session: Session }) {
               </div>
             </Card>
           ))}
+        <Pagination page={page} pageCount={meta?.totalPages ?? 1} onPageChange={setPage} />
         </div>
       ) : (
         <EmptyState

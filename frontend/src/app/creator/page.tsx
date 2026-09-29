@@ -5,7 +5,7 @@ import { BriefcaseBusiness, CircleCheckBig, Clock, Wallet } from 'lucide-react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorState, SkeletonCard, StatCard } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
@@ -93,7 +93,7 @@ function Dash({ session }: { session: Session }) {
         {discovery.loading ? (
           <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
         ) : discovery.error ? (
-          <EmptyState message={discovery.error} />
+          <ErrorState error={discovery.error} onRetry={discovery.reload} />
         ) : campaigns.length > 0 ? (
           <ul className="divide-y divide-neutral-100">
             {campaigns.map((c) => (
@@ -119,7 +119,7 @@ function Dash({ session }: { session: Session }) {
         {activity.loading ? (
           <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
         ) : activity.error ? (
-          <EmptyState message={activity.error} />
+          <ErrorState error={activity.error} onRetry={activity.reload} />
         ) : feed.length > 0 ? (
           <ul className="divide-y divide-neutral-100">
             {feed.map((n) => (

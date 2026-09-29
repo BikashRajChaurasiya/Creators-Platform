@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
+import { Badge, Card, EmptyState, ErrorState, SkeletonCard, StatCard } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
@@ -103,7 +103,7 @@ function BrandDash({ session }: { session: Session }) {
         {campaigns.loading ? (
           <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
         ) : campaigns.error ? (
-          <EmptyState message={campaigns.error} />
+          <ErrorState error={campaigns.error} onRetry={campaigns.reload} />
         ) : list.length > 0 ? (
           <ul className="divide-y divide-neutral-100">
             {list.map((c) => (
@@ -139,7 +139,7 @@ function BrandDash({ session }: { session: Session }) {
         {activity.loading ? (
           <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
         ) : activity.error ? (
-          <EmptyState message={activity.error} />
+          <ErrorState error={activity.error} onRetry={activity.reload} />
         ) : feed.length > 0 ? (
           <ul className="divide-y divide-neutral-100">
             {feed.map((n) => (

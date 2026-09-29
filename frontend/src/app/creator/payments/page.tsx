@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
+
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { Badge, Card, EmptyState, SkeletonCard, StatCard } from '@/components/ui';
-import { useApi } from '@/lib/use-api';
+import { Badge, Card, EmptyState, ErrorState, SkeletonCard, StatCard , Pagination} from '@/components/ui';
+import { useApi, useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
 interface PaymentRow {
@@ -70,7 +72,8 @@ function PayoutStepper({ status }: { status: string }) {
 }
 
 function Payouts({ session }: { session: Session }) {
-  const payments = useApi<PaymentRow[]>('/payments?scope=received&limit=50', session.tokens.accessToken);
+  const [page, setPage] = useState(1);
+  const payments = useApiPage<PaymentRow[]>(`/payments?scope=received&limit=50&page=${page}`, session.tokens.accessToken);
   const summary = useApi<Summary>('/payments/summary', session.tokens.accessToken);
   const s = summary.data;
   const rows = payments.data ?? [];
@@ -92,7 +95,7 @@ function Payouts({ session }: { session: Session }) {
           <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
         </div>
       ) : summary.error ? (
-        <EmptyState message={summary.error} />
+        <ErrorState error={summary.error} onRetry={summary.reload} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard label="Total earned" value={CURRENCY(s?.totalEarned ?? 0)} icon="💰" tint="green" sub="Payouts received" />
@@ -109,8 +112,9 @@ function Payouts({ session }: { session: Session }) {
         {payments.loading ? (
           <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
         ) : payments.error ? (
-          <EmptyState message={payments.error} />
+          <ErrorState error={payments.error} onRetry={payments.reload} />
         ) : rows.length > 0 ? (
+          <>
           <ul className="divide-y divide-neutral-100">
             {rows.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -125,6 +129,8 @@ function Payouts({ session }: { session: Session }) {
               </li>
             ))}
           </ul>
+          <Pagination page={page} pageCount={payments.meta?.totalPages ?? 1} onPageChange={setPage} />
+          </>
         ) : (
           <EmptyState title="No payouts yet" message="Your approved campaign deliveries will be released here." />
         )}

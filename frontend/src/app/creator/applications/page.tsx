@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV, statusColor } from '@/lib/ui';
-import { Badge, Button, Card, EmptyState, SkeletonCard, TextArea } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, TextArea, Pagination } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { UploadImageButton } from '@/components/image-upload';
-import { useApi } from '@/lib/use-api';
+import { useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 import { useToast } from '@/components/toast';
 
@@ -21,7 +21,8 @@ interface AppRow {
 }
 
 function MyApplications({ session }: { session: Session }) {
-  const { data, loading, error, reload } = useApi<AppRow[]>('/applications?scope=mine&limit=50', session.tokens.accessToken);
+  const [page, setPage] = useState(1);
+  const { data, meta, loading, error, reload } = useApiPage<AppRow[]>(`/applications?scope=mine&limit=50&page=${page}`, session.tokens.accessToken);
   const [tab, setTab] = useState<string>('ALL');
   const [openFor, setOpenFor] = useState<string | null>(null);
   const [fileUrl, setFileUrl] = useState('');
@@ -82,7 +83,7 @@ function MyApplications({ session }: { session: Session }) {
       {loading ? (
         <div className="space-y-3">{[0, 1, 2].map((i) => <SkeletonCard key={i} />)}</div>
       ) : error ? (
-        <EmptyState message={error} />
+        <ErrorState error={error} onRetry={reload} />
       ) : list.length > 0 ? (
         <div className="flex flex-col gap-3">
           {list.map((a) => (
@@ -132,6 +133,7 @@ function MyApplications({ session }: { session: Session }) {
               )}
             </Card>
           ))}
+        <Pagination page={page} pageCount={meta?.totalPages ?? 1} onPageChange={setPage} />
         </div>
       ) : (
         <EmptyState title="You haven't applied to any campaigns yet" message="Explore open campaigns and send your first pitch." />

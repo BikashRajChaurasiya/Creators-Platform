@@ -5,11 +5,11 @@ import { Loader2, Save, ShieldCheck } from 'lucide-react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV } from '@/lib/ui';
-import { Badge, Card, EmptyState, Input, LoadingState, TextArea } from '@/components/ui';
+import { Badge, Card, ErrorState, Input, LoadingState, TextArea } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { UploadImageButton } from '@/components/image-upload';
 import { useApi } from '@/lib/use-api';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, describeApiError } from '@/lib/api';
 import { Session } from '@/lib/session';
 
 interface BrandProfile {
@@ -71,7 +71,7 @@ function BrandProfileForm({ session, profile }: { session: Session; profile: Bra
       });
       setMessage('Brand profile saved.');
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Failed to save profile.');
+      setMessage(describeApiError(err, 'Failed to save profile.'));
     } finally {
       setSaving(false);
     }
@@ -90,7 +90,7 @@ function BrandProfileForm({ session, profile }: { session: Session; profile: Bra
       setDocUrl('');
       setMessage('Verification submitted. Our team will review it shortly.');
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Failed to submit verification.');
+      setMessage(describeApiError(err, 'Failed to submit verification.'));
     } finally {
       setSaving(false);
     }
@@ -179,13 +179,13 @@ function BrandProfileForm({ session, profile }: { session: Session; profile: Bra
 }
 
 function BrandProfilePageInner({ session }: { session: Session }) {
-  const { data, loading, error } = useApi<BrandProfile>('/brand/me/profile', session.tokens.accessToken);
+  const { data, loading, error, reload } = useApi<BrandProfile>('/brand/me/profile', session.tokens.accessToken);
 
   if (loading) {
     return <LoadingState label="Loading profile…" />;
   }
   if (error) {
-    return <EmptyState variant="error" message={error} />;
+    return <ErrorState error={error} onRetry={reload} />;
   }
   if (!data) return null;
 

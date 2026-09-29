@@ -17,7 +17,7 @@ import { FileInput, Megaphone, TrendingUp, Users } from 'lucide-react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV, CURRENCY } from '@/lib/ui';
-import { Card, EmptyState, SkeletonCard, StatCard, Tabs } from '@/components/ui';
+import { Card, EmptyState, ErrorState, SkeletonCard, StatCard, Tabs } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 
@@ -119,7 +119,7 @@ function Analytics({ session }: { session: Session }) {
           <SkeletonCard /> <SkeletonCard /> <SkeletonCard /> <SkeletonCard />
         </div>
       ) : report.error ? (
-        <EmptyState message={report.error} />
+        <ErrorState error={report.error} onRetry={report.reload} />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard label="New signups" value={r?.period.newUsers ?? 0} icon={Users} tint="primary" sub={`${r?.users ?? 0} total users`} />
@@ -134,7 +134,7 @@ function Analytics({ session }: { session: Session }) {
           <SkeletonCard /> <SkeletonCard />
         </div>
       ) : series.error ? (
-        <EmptyState message={series.error} />
+        <ErrorState error={series.error} onRetry={series.reload} />
       ) : points.length > 1 ? (
         <>
           <Card>

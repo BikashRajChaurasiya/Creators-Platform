@@ -4,8 +4,8 @@ import { FormEvent, useEffect, useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { ADMIN_NAV } from '@/lib/ui';
-import { ApiError, apiRequest } from '@/lib/api';
-import { Button, Card, EmptyState, Input, Spinner } from '@/components/ui';
+import { apiRequest, describeApiError } from '@/lib/api';
+import { Button, Card, ErrorState, Input, Spinner } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
 import { Settings } from '@ugcnp/shared';
@@ -76,7 +76,7 @@ function SettingsPage({ session }: { session: Session }) {
       toast.success('Settings saved — your brand theme updated across the platform.');
       reload();
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'Failed to save settings');
+      toast.error(describeApiError(err, 'Failed to save settings'));
     } finally {
       setSaving(false);
     }
@@ -87,7 +87,7 @@ function SettingsPage({ session }: { session: Session }) {
   }, [data]);
 
   if (loading) return <Spinner label="Loading settings…" />;
-  if (error) return <EmptyState message={error} />;
+  if (error) return <ErrorState error={error} onRetry={reload} />;
 
   return (
     <div className="flex flex-col gap-4">

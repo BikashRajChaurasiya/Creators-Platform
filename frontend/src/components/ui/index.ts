@@ -13,7 +13,7 @@ export {
   type CardProps,
   type BadgeProps,
 } from './card';
-export { Alert, EmptyState, alertVariants, type AlertProps, type EmptyStateProps } from './feedback';
+export { Alert, EmptyState, ErrorState, alertVariants, type AlertProps, type EmptyStateProps } from './feedback';
 export {
   Skeleton,
   SkeletonText,

@@ -6,11 +6,11 @@ import { CREATOR_CATEGORIES, PAYOUT_CHANNELS } from '@ugcnp/shared';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV } from '@/lib/ui';
-import { Card, EmptyState, Input, LoadingState, TextArea } from '@/components/ui';
+import { Card, ErrorState, Input, LoadingState, TextArea } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { UploadImageButton } from '@/components/image-upload';
 import { useApi } from '@/lib/use-api';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, describeApiError } from '@/lib/api';
 import { Session } from '@/lib/session';
 
 interface CreatorProfile {
@@ -152,7 +152,7 @@ function CreatorProfileForm({ session, profile }: { session: Session; profile: C
       });
       setMessage('Profile saved.');
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Failed to save profile.');
+      setMessage(describeApiError(err, 'Failed to save profile.'));
     } finally {
       setSaving(false);
     }
@@ -299,13 +299,13 @@ function CreatorProfileForm({ session, profile }: { session: Session; profile: C
 }
 
 function CreatorProfilePageInner({ session }: { session: Session }) {
-  const { data, loading, error } = useApi<CreatorProfile>('/creator/me/profile', session.tokens.accessToken);
+  const { data, loading, error, reload } = useApi<CreatorProfile>('/creator/me/profile', session.tokens.accessToken);
 
   if (loading) {
     return <LoadingState label="Loading profile…" />;
   }
   if (error) {
-    return <EmptyState variant="error" message={error} />;
+    return <ErrorState error={error} onRetry={reload} />;
   }
   if (!data) return null;
 

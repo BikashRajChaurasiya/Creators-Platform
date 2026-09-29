@@ -151,6 +151,6 @@ export class AdminController {
   @Get('audit-logs')
   @Permissions('audit.read')
   auditLogs(@Query(new ZodValidationPipe(auditQuery)) query: { page: number; limit: number; action?: string }) {
-    return { data: this.audit.list(query.page, query.limit, { action: query.action }) };
+    return this.audit.list(query.page, query.limit, { action: query.action });
   }
 }
