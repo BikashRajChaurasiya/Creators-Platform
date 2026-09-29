@@ -1,10 +1,11 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { type CampaignStatus, nextCampaignStatuses } from '@ugcnp/shared';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { BRAND_NAV, CURRENCY, statusColor } from '@/lib/ui';
-import { ApiError, apiRequest } from '@/lib/api';
+import { ApiError, apiRequest, describeApiError } from '@/lib/api';
 import { Alert, Badge, Button, Card, EmptyState, ErrorState, Input, Select, SkeletonCard, TextArea, Pagination } from '@/components/ui';
 import { useApi, useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
@@ -14,7 +15,7 @@ interface CampaignRow {
   id: string;
   title: string;
   description: string;
-  status: string;
+  status: CampaignStatus;
   budgetMin: number;
   budgetMax: number;
   deadline: string | null;
@@ -117,7 +118,7 @@ function BrandCampaigns({ session }: { session: Session }) {
     setForm((f) => ({ ...f, title: '', description: '', product: '' }));
   }
 
-  async function changeState(c: CampaignRow, status: string) {
+  async function changeState(c: CampaignRow, status: CampaignStatus) {
     setBusyId(c.id);
     try {
       await apiRequest('/campaigns/' + c.id + '/state', {
@@ -125,10 +126,10 @@ function BrandCampaigns({ session }: { session: Session }) {
         token: session.tokens.accessToken,
         body: { status },
       });
-      toast.success(`Campaign is now ${status}.`);
+      toast.success(`Campaign is now ${status.replace(/_/g, ' ').toLowerCase()}.`);
       reload();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'State change failed');
+      toast.error(describeApiError(err, 'State change failed'));
     } finally {
       setBusyId(null);
     }
@@ -257,18 +258,29 @@ function BrandCampaigns({ session }: { session: Session }) {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <Badge tone={statusColor(c.status)}>{c.status}</Badge>
-                  <div className="flex gap-1.5">
-                    {c.status === 'DRAFT' && (
-                      <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === c.id} onClick={() => changeState(c, 'RECRUITING')}>
-                        Publish
-                      </Button>
-                    )}
-                    {c.status === 'RECRUITING' && (
-                      <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === c.id} onClick={() => changeState(c, 'CANCELLED')}>
-                        Close
-                      </Button>
-                    )}
-                  </div>
+                  {nextCampaignStatuses(c.status).length > 0 ? (
+                    <Select
+                      aria-label={`Move campaign "${c.title}" to another state`}
+                      className="h-8 w-40 px-2 py-0 text-xs"
+                      value=""
+                      disabled={busyId === c.id}
+                      onChange={(e) => {
+                        const next = e.target.value as CampaignStatus;
+                        if (next) changeState(c, next);
+                      }}
+                    >
+                      <option value="">Move to…</option>
+                      {nextCampaignStatuses(c.status).map((next) => (
+                        <option key={next} value={next}>
+                          {next.replace(/_/g, ' ').toLowerCase()}
+                        </option>
+                      ))}
+                    </Select>
+                  ) : (
+                    <p className="text-xs text-neutral-400">
+                      {c.status === 'CANCELLED' ? 'Campaign cancelled' : 'Campaign complete'}
+                    </p>
+                  )}
                 </div>
               </div>
             </Card>

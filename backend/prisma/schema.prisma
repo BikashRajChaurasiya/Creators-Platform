@@ -478,6 +478,7 @@ model Payment {
   campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   application Application   @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   creator     User          @relation("PaymentCreator", fields: [creatorId], references: [id])
+  invoice     Invoice?
 
   @@index([creatorId])
   @@index([status])
@@ -487,6 +488,9 @@ model Invoice {
   id         String        @id @default(uuid())
   brandId    String
   campaignId String
+  /// The payout this invoice bills. Without it, releasing one payment had to
+  /// mark every DRAFT invoice on the campaign as paid.
+  paymentId  String?       @unique
   amount     Int
   commissionPercent Float  @default(15)
   commissionAmount Int
@@ -498,6 +502,7 @@ model Invoice {
 
   brand      Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
   campaign   Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  payment    Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   @@index([brandId])
 }
 

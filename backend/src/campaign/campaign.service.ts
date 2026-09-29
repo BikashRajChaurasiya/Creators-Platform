@@ -73,7 +73,11 @@ export class CampaignService {
         currency: budget.currency,
         perCreator: budget.perCreator,
         usageRights: input.usageRights,
-        status: (input.status as CampaignStatus) ?? 'DRAFT',
+        // Every campaign starts as a draft. `status` is no longer accepted on
+        // create, so a brand cannot jump straight to PUBLISHED/COMPLETED and
+        // skip the lifecycle — and with it the notifications and the
+        // `publishedAt`/`completedAt` bookkeeping that `transition` performs.
+        status: 'DRAFT',
         createdById: user.userId,
       },
       include: { brand: { select: { companyName: true } } },

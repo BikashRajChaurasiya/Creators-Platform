@@ -12,6 +12,8 @@ import { Features } from '@/components/home/features';
 import { HowItWorks } from '@/components/home/how-it-works';
 import { Testimonials } from '@/components/home/testimonials';
 import { SiteFooter } from '@/components/home/site-footer';
+import { ROLE_PATH } from '@/lib/ui';
+import type { AllowedRole } from '@/components/require-auth';
 import type { PlatformStats } from '@ugcnp/shared';
 
 function useStats() {
@@ -46,8 +48,9 @@ export default function HomePage() {
   useEffect(() => {
     const session = loadSession();
     if (session) {
-      const role = session.user.role.toLowerCase();
-      router.replace(`/${role === 'creator' ? 'creator' : role === 'brand' ? 'brand' : 'admin'}`);
+      // MANAGER/QA/FINANCE all belong in the admin console; routing them
+      // anywhere else sent them back here in a loop.
+      router.replace(ROLE_PATH[session.user.role.toLowerCase() as AllowedRole] ?? '/login');
     }
   }, [router]);
 

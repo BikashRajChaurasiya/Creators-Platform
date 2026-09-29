@@ -3,8 +3,9 @@
 import { useState } from 'react';
 
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV, CURRENCY, statusColor } from '@/lib/ui';
+import { ADMIN_CONSOLE_ROLES, CURRENCY, adminNavFor, statusColor } from '@/lib/ui';
 import { Badge, Card, EmptyState, ErrorState, SkeletonCard, Pagination } from '@/components/ui';
 import { useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
@@ -72,9 +73,9 @@ function AdminCampaigns({ session }: { session: Session }) {
 
 export default function AdminCampaignsPage() {
   return (
-    <RequireAuth roles={['admin']}>
+    <RequireAuth roles={ADMIN_CONSOLE_ROLES}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <AdminCampaigns session={session} />
         </PortalShell>
       )}

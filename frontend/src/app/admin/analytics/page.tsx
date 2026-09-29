@@ -15,8 +15,9 @@ import {
 } from 'recharts';
 import { FileInput, Megaphone, TrendingUp, Users } from 'lucide-react';
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV, CURRENCY } from '@/lib/ui';
+import { ADMIN_CONSOLE_ROLES, CURRENCY, adminNavFor } from '@/lib/ui';
 import { Card, EmptyState, ErrorState, SkeletonCard, StatCard, Tabs } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
@@ -228,9 +229,9 @@ function Analytics({ session }: { session: Session }) {
 
 export default function AdminAnalyticsPage() {
   return (
-    <RequireAuth roles={['admin']}>
+    <RequireAuth roles={ADMIN_CONSOLE_ROLES}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <Analytics session={session} />
         </PortalShell>
       )}

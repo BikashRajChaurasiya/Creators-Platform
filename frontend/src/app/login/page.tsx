@@ -7,8 +7,8 @@ import { AuthShell, Form } from '@/components/auth-shell';
 import { Button, Input } from '@/components/ui';
 import { apiLogin } from '@/lib/session';
 import { ApiError } from '@/lib/api';
-
-const ROLE_PATH: Record<string, string> = { creator: '/creator', brand: '/brand', admin: '/admin' };
+import { ROLE_PATH } from '@/lib/ui';
+import type { AllowedRole } from '@/components/require-auth';
 
 function PasswordEye({ open }: { open: boolean }) {
   return (
@@ -43,7 +43,7 @@ function LoginForm() {
     setLoading(true);
     try {
       const session = await apiLogin(email, password, remember);
-      const role = session.user.role.toLowerCase();
+      const role = session.user.role.toLowerCase() as AllowedRole;
       const dest = params.get('next') ?? ROLE_PATH[role] ?? '/';
       router.push(dest);
     } catch (err) {

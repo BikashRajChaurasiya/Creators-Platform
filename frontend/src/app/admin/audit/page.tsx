@@ -3,8 +3,9 @@
 import { useState } from 'react';
 
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV } from '@/lib/ui';
+import { adminNavFor } from '@/lib/ui';
 import { Card, EmptyState, ErrorState, SkeletonCard, Pagination } from '@/components/ui';
 import { useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
@@ -70,7 +71,7 @@ export default function AdminAuditPage() {
   return (
     <RequireAuth roles={['admin']}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <Audit session={session} />
         </PortalShell>
       )}

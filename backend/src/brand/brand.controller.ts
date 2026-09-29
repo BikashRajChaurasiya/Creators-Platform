@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import { brandProfileSchema, z } from '@ugcnp/shared';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
@@ -23,7 +23,9 @@ export class BrandController {
 
   @Post('me/verification')
   verify(@CurrentUser('id') userId: string, @Body() body: { documentUrl?: string }) {
-    if (!body.documentUrl) throw new Error('documentUrl required');
+    // A bare `Error` is not an HttpException, so a missing document was
+    // reported to the client as a 500 server fault instead of a 400.
+    if (!body.documentUrl) throw new BadRequestException('documentUrl is required');
     return { data: this.brand.submitVerification(userId, body.documentUrl) };
   }
 

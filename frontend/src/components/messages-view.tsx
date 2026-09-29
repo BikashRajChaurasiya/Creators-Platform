@@ -46,7 +46,16 @@ function formatTime(iso: string): string {
   return sameDay ? time : `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${time}`;
 }
 
-export function MessagesView({ session, newParticipantHref }: { session: Session; newParticipantHref: string }) {
+export function MessagesView({
+  session,
+  newParticipantHref,
+  initialConversationId,
+}: {
+  session: Session;
+  newParticipantHref: string;
+  /** Opens this conversation as soon as the list arrives (from `?c=<id>`). */
+  initialConversationId?: string | null;
+}) {
   const conv = useApi<Conversation[]>('/conversations', session.tokens.accessToken);
   const [active, setActive] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[] | null>(null);
@@ -56,8 +65,10 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const openedRef = useRef<string | null>(null);
 
   async function open(c: Conversation) {
+    openedRef.current = c.id;
     setActive(c);
     setLoading(true);
     setLoadError(null);
@@ -82,6 +93,15 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, active]);
+
+  // Deep link: /messages?c=<id> selects that conversation once the list loads.
+  // `openedRef` keeps it from re-opening (and re-marking read) on every reload.
+  useEffect(() => {
+    if (!initialConversationId || !conv.data) return;
+    if (openedRef.current === initialConversationId) return;
+    const match = conv.data.find((c) => c.id === initialConversationId);
+    if (match) void open(match);
+  }, [initialConversationId, conv.data]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -122,8 +142,12 @@ export function MessagesView({ session, newParticipantHref }: { session: Session
             href={newParticipantHref}
             className="block w-full rounded-lg border border-dashed border-line-strong px-3 py-2 text-center text-sm font-medium text-primary transition-colors hover:border-primary hover:bg-primary-soft"
           >
-            + Start a conversation
+            + Message a creator/brand
           </Link>
+          <p className="mt-1.5 text-center text-[11px] leading-snug text-fg-subtle">
+            Pick a person from your {newParticipantHref.includes('applications') ? 'applications' : 'campaigns'} and press
+            &ldquo;Message&rdquo;.
+          </p>
         </div>
         {conv.loading ? (
           <Spinner />

@@ -51,7 +51,11 @@ interface AcceptedApp {
   status: string;
   campaign: { id: string; title: string; budgetMin: number; budgetMax: number };
   creator: { user: { id: string; name: string } };
+  payment: { id: string; status: string; amount: number; paidAt: string | null } | null;
 }
+
+/** A payout can be prepared again only when the previous one did not go through. */
+const RETRYABLE = new Set(['FAILED', 'CANCELLED', 'REFUNDED']);
 
 function BrandPayments({ session }: { session: Session }) {
   const [page, setPage] = useState(1);
@@ -64,7 +68,12 @@ function BrandPayments({ session }: { session: Session }) {
   const apps = useApi<AcceptedApp[]>('/applications?scope=received&limit=50', session.tokens.accessToken);
   const toast = useToast();
 
-  const accepted = (apps.data ?? []).filter((a) => a.status === 'ACCEPTED');
+  // Only accepted applications are payable, and `Payment.applicationId` is
+  // unique — so anyone already PENDING/APPROVED/PAID is filtered out here
+  // instead of being offered and then rejected with a 409.
+  const accepted = (apps.data ?? []).filter(
+    (a) => a.status === 'ACCEPTED' && (!a.payment || RETRYABLE.has(a.payment.status)),
+  );
   const s = summary.data;
   const rows = payments.data ?? [];
   const invoiceRows = invoices.data ?? [];

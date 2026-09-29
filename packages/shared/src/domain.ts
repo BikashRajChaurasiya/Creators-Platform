@@ -40,15 +40,27 @@ export const CAMPAIGN_STATUSES = [
 ] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
-export const CAMPAIGN_STATUS_FLOW = [
-  'DRAFT',
-  'RECRUITING',
-  'SHORTLISTING',
-  'PRODUCTION',
-  'REVIEW',
-  'PUBLISHED',
-  'COMPLETED',
-] as const;
+/**
+ * Allowed campaign lifecycle transitions — the single source of truth for the
+ * state machine. The backend enforces it in `assertTransition`, and the brand
+ * and admin portals render only the reachable next states, so the UI cannot
+ * offer a move the API will reject.
+ */
+export const CAMPAIGN_TRANSITIONS: Record<CampaignStatus, readonly CampaignStatus[]> = {
+  DRAFT: ['RECRUITING', 'CANCELLED'],
+  RECRUITING: ['SHORTLISTING', 'COMPLETED', 'CANCELLED'],
+  SHORTLISTING: ['PRODUCTION', 'RECRUITING', 'CANCELLED'],
+  PRODUCTION: ['REVIEW', 'CANCELLED'],
+  REVIEW: ['PUBLISHED', 'PRODUCTION', 'CANCELLED'],
+  PUBLISHED: ['COMPLETED', 'CANCELLED'],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
+/** States a campaign can be moved to from `status`, or `[]` when it is terminal. */
+export function nextCampaignStatuses(status: CampaignStatus): readonly CampaignStatus[] {
+  return CAMPAIGN_TRANSITIONS[status] ?? [];
+}
 
 export const CAMPAIGN_OBJECTIVES = [
   'BRAND_AWARENESS',

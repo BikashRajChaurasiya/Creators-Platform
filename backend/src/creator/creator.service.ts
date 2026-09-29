@@ -121,8 +121,27 @@ export class CreatorService {
 
   async submitVerification(userId: string, documentUrl: string) {
     const profile = await this.ensureProfile(userId);
-    return this.prisma.creatorVerification.create({
-      data: { profileId: profile.id, documentUrl, status: 'PENDING' },
+    return this.prisma.$transaction(async (tx) => {
+      // Re-submitting while a request is already queued is a no-op rather than
+      // a second open review, which would leave two rows competing to decide
+      // the same profile's status.
+      const pending = await tx.creatorVerification.findFirst({
+        where: { profileId: profile.id, status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (pending) return pending;
+
+      const created = await tx.creatorVerification.create({
+        data: { profileId: profile.id, documentUrl, status: 'PENDING' },
+      });
+      // The portal reads `verificationStatus` off the profile, so the flag has
+      // to be moved too — creating the review row alone left it UNVERIFIED and
+      // the submission looked like it had done nothing.
+      await tx.creatorProfile.update({
+        where: { id: profile.id },
+        data: { verificationStatus: 'PENDING' },
+      });
+      return created;
     });
   }
 

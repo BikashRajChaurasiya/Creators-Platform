@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { AppModule } from './app.module';
 import { ZodFilter } from './common/filters/zod.filter';
+import { PrismaExceptionFilter } from './common/filters/prisma.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 /**
@@ -39,7 +40,7 @@ async function bootstrap() {
   app.enableCors({ origin: resolveOrigins(config), credentials: true });
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(compression());
-  app.useGlobalFilters(new ZodFilter());
+  app.useGlobalFilters(new ZodFilter(), new PrismaExceptionFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
   app.enableShutdownHooks();
 

@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV, CURRENCY, statusColor } from '@/lib/ui';
+import { CURRENCY, adminNavFor, statusColor } from '@/lib/ui';
 import { ApiError, apiRequest } from '@/lib/api';
 import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, StatCard , Pagination} from '@/components/ui';
 import { useApi, useApiPage } from '@/lib/use-api';
@@ -206,9 +207,9 @@ function Divider() {
 
 export default function AdminFinancePage() {
   return (
-    <RequireAuth roles={['admin']}>
+    <RequireAuth roles={['admin', 'finance']}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <Finance session={session} />
         </PortalShell>
       )}

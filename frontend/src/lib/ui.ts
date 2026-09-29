@@ -18,21 +18,57 @@ export const BRAND_NAV: { href: string; label: string }[] = [
   { href: '/brand/profile', label: 'Profile' },
 ];
 
-export const ADMIN_NAV: { href: string; label: string }[] = [
+export interface NavEntry {
+  href: string;
+  label: string;
+  /** Roles allowed to open this page. Omitted means every ops role. */
+  roles?: readonly AllowedRole[];
+}
+
+/**
+ * Admin console navigation.
+ *
+ * Each entry carries the roles the backend actually authorises, so the nav
+ * never offers a link that immediately redirects the user away. The page
+ * guards mirror these lists.
+ */
+export const ADMIN_NAV: NavEntry[] = [
   { href: '/admin', label: 'Dashboard' },
   { href: '/admin/analytics', label: 'Analytics' },
-  { href: '/admin/users', label: 'Users' },
+  { href: '/admin/users', label: 'Users', roles: ['admin', 'manager'] },
   { href: '/admin/campaigns', label: 'Campaigns' },
-  { href: '/admin/finance', label: 'Finance' },
-  { href: '/admin/settings', label: 'Settings' },
-  { href: '/admin/audit', label: 'Audit log' },
+  { href: '/admin/verifications', label: 'Verifications', roles: ['admin'] },
+  { href: '/admin/finance', label: 'Finance', roles: ['admin', 'finance'] },
+  { href: '/admin/settings', label: 'Settings', roles: ['admin'] },
+  { href: '/admin/audit', label: 'Audit log', roles: ['admin'] },
 ];
+
+/** Roles that get the admin console rather than a creator/brand portal. */
+export const ADMIN_CONSOLE_ROLES = ['admin', 'manager', 'qa', 'finance'] as const satisfies readonly AllowedRole[];
+
+/** Where each role lands after signing in. */
+export const ROLE_PATH: Record<AllowedRole, string> = {
+  creator: '/creator',
+  brand: '/brand',
+  admin: '/admin',
+  manager: '/admin',
+  qa: '/admin',
+  finance: '/admin',
+};
 
 export const ROLE_BY_ALLOWED: Record<AllowedRole, string> = {
   creator: 'CREATOR',
   brand: 'BRAND',
   admin: 'ADMIN',
+  manager: 'MANAGER',
+  qa: 'QA',
+  finance: 'FINANCE',
 };
+
+/** Narrows the admin nav to the pages `role` is allowed to open. */
+export function adminNavFor(role: AllowedRole): NavEntry[] {
+  return ADMIN_NAV.filter((item) => !item.roles || item.roles.includes(role));
+}
 
 export const ROLE_LABEL: Record<string, string> = {
   CREATOR: 'Creator',

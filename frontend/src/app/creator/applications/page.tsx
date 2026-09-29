@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { CREATOR_NAV, statusColor } from '@/lib/ui';
+import { CREATOR_NAV, CURRENCY, statusColor } from '@/lib/ui';
 import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, TextArea, Pagination } from '@/components/ui';
 import { apiRequest } from '@/lib/api';
 import { UploadImageButton } from '@/components/image-upload';
@@ -17,6 +17,7 @@ interface AppRow {
   pitch: string;
   createdAt: string;
   campaign: { id: string; title: string; budgetMin: number; budgetMax: number; status: string };
+  payment: { id: string; status: string; amount: number; paidAt: string | null } | null;
   _count?: { submissions: number };
 }
 
@@ -99,6 +100,15 @@ function MyApplications({ session }: { session: Session }) {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <Badge tone={statusColor(a.status)}>{a.status}</Badge>
+                  {a.payment && (
+                    <Badge tone={statusColor(a.payment.status)}>
+                      {a.payment.status === 'PAID'
+                        ? `Paid ${CURRENCY(a.payment.amount)}`
+                        : a.payment.status === 'PENDING' || a.payment.status === 'APPROVED'
+                          ? 'Payout in progress'
+                          : `Payout ${a.payment.status.toLowerCase()}`}
+                    </Badge>
+                  )}
                   {a.status === 'ACCEPTED' && (
                     <Button
                       variant="outline"

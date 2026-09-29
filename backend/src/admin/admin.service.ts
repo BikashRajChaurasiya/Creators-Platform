@@ -222,6 +222,75 @@ export class AdminService {
     return updated;
   }
 
+  // --------------------------------------------------------- verification
+  /**
+   * Identity verification queue.
+   *
+   * `CreatorVerification`/`BrandVerification` rows are created by the portals
+   * but nothing previously read them, so a submission stayed PENDING forever.
+   */
+  async listVerifications(status = 'PENDING') {
+    const where = { status: status as 'PENDING' };
+    const [creators, brands] = await Promise.all([
+      this.prisma.creatorVerification.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        include: {
+          profile: {
+            select: {
+              id: true,
+              verificationStatus: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.brandVerification.findMany({
+        where,
+        orderBy: { createdAt: 'asc' },
+        include: {
+          brand: {
+            select: {
+              id: true,
+              companyName: true,
+              verificationStatus: true,
+              user: { select: { id: true, name: true, email: true } },
+            },
+          },
+        },
+      }),
+    ]);
+    return { data: { creators, brands } };
+  }
+
+  async reviewCreatorVerification(actor: JwtUser, id: string, status: 'VERIFIED' | 'REJECTED', notes?: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.creatorVerification.update({
+        where: { id },
+        data: { status, notes: notes || null, reviewedBy: actor.userId, reviewedAt: new Date() },
+      });
+      // The profile-level flag is what the portal and creator discovery read,
+      // so it has to move with the decision.
+      await tx.creatorProfile.update({ where: { id: row.profileId }, data: { verificationStatus: status } });
+      return row;
+    });
+    await this.audit.log({ actor, action: 'creator.verification.review', targetType: 'CreatorVerification', targetId: id, metadata: { status } });
+    return result;
+  }
+
+  async reviewBrandVerification(actor: JwtUser, id: string, status: 'VERIFIED' | 'REJECTED', notes?: string) {
+    const result = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.brandVerification.update({
+        where: { id },
+        data: { status, notes: notes || null, reviewedBy: actor.userId, reviewedAt: new Date() },
+      });
+      await tx.brand.update({ where: { id: row.brandId }, data: { verificationStatus: status } });
+      return row;
+    });
+    await this.audit.log({ actor, action: 'brand.verification.review', targetType: 'BrandVerification', targetId: id, metadata: { status } });
+    return result;
+  }
+
   // ------------------------------------------------------------ settings
   async getSettings() {
     const rows = await this.prisma.platformSetting.findMany();

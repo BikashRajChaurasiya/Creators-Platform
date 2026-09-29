@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { $Enums, Prisma } from '@prisma/client';
 import { paymentCreateSchema, PAYOUT_CHANNELS, z } from '@ugcnp/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -14,6 +14,18 @@ import { JwtUser } from '../common/decorators/current-user.decorator';
  *
  * A single operator can never both prepare and approve/release a payment.
  */
+
+/**
+ * Statuses from which an application may be paid again. Because
+ * `Payment.applicationId` is unique there is only ever one payout row per
+ * application, so a failed disbursement is retried on that row rather than by
+ * creating a second one.
+ */
+const RETRYABLE_PAYMENT_STATUSES: ReadonlySet<$Enums.PaymentStatus> = new Set([
+  'FAILED',
+  'CANCELLED',
+  'REFUNDED',
+]);
 
 @Injectable()
 export class PaymentService {
@@ -73,32 +85,83 @@ export class PaymentService {
     if (!creator) throw new NotFoundException('Creator not found');
     if (!campaign) throw new NotFoundException('Campaign not found');
 
+    // `Payment.applicationId` is unique, so there is exactly one payout record
+    // per application. Checked up front so the caller gets an explicit 409
+    // naming the reason rather than an opaque 500 from the P2002 race.
+    //
+    // A payout that was already sent, approved, or completed is final. One that
+    // failed, was cancelled, or was refunded is *retried* on the same row: the
+    // unique constraint would otherwise leave the application permanently
+    // unpayable after a single failed disbursement.
+    const existing = await this.prisma.payment.findUnique({
+      where: { applicationId: application.id },
+      select: { id: true, status: true, amount: true },
+    });
+    if (existing && !RETRYABLE_PAYMENT_STATUSES.has(existing.status)) {
+      throw new ConflictException(
+        `This application already has a ${existing.status} payment for NPR ${existing.amount}.`,
+      );
+    }
+
     const commissionAmount = Math.round((input.amount * commissionPercent) / 100);
     const payoutAmount = input.amount - commissionAmount;
 
     const payment = await this.prisma.$transaction(async (tx) => {
-      const p = await tx.payment.create({
-        data: {
-          campaignId: input.campaignId,
-          applicationId: application.id,
-          creatorId: input.creatorId,
-          amount: input.amount,
-          commissionPercent,
-          commissionAmount,
-          payoutAmount,
-          type: input.type,
-          preparedById: user.userId,
-          description: input.description || null,
-        },
-      });
-      await tx.invoice.create({
-        data: {
+      // Retrying: reuse the row and reset the maker-checker trail so it has to
+      // be prepared, approved and released again from scratch.
+      const p = existing
+        ? await tx.payment.update({
+            where: { id: existing.id },
+            data: {
+              amount: input.amount,
+              commissionPercent,
+              commissionAmount,
+              payoutAmount,
+              type: input.type,
+              status: 'PENDING' as const,
+              preparedById: user.userId,
+              approvedById: null,
+              paidAt: null,
+              transactionId: null,
+              providerRef: null,
+              description: input.description || null,
+            },
+          })
+        : await tx.payment.create({
+            data: {
+              campaignId: input.campaignId,
+              applicationId: application.id,
+              creatorId: input.creatorId,
+              amount: input.amount,
+              commissionPercent,
+              commissionAmount,
+              payoutAmount,
+              type: input.type,
+              preparedById: user.userId,
+              description: input.description || null,
+            },
+          });
+
+      // One invoice per payment (`Invoice.paymentId` is unique). A retry
+      // reopens the existing invoice as DRAFT instead of leaving a stale
+      // one behind.
+      await tx.invoice.upsert({
+        where: { paymentId: p.id },
+        create: {
           brandId: campaign.brandId,
           campaignId: campaign.id,
+          paymentId: p.id,
           amount: input.amount,
           commissionPercent,
           commissionAmount,
           status: 'DRAFT',
+        },
+        update: {
+          amount: input.amount,
+          commissionPercent,
+          commissionAmount,
+          status: 'DRAFT',
+          paidAt: null,
         },
       });
       return p;
@@ -181,8 +244,11 @@ export class PaymentService {
           transactionId: body.providerRef || payment.transactionId,
         },
       });
+      // Scoped to this payment's own invoice. The previous filter was
+      // `campaignId + DRAFT`, which marked every unpaid invoice on the campaign
+      // as paid the moment any single payout was released.
       await tx.invoice.updateMany({
-        where: { campaignId: payment.campaignId, status: 'DRAFT' },
+        where: { paymentId },
         data: { status: 'PAID', paidAt: new Date() },
       });
       return updated;

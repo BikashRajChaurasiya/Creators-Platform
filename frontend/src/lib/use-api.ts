@@ -27,7 +27,14 @@ interface PaginatedApiState<T> extends ApiState<T> {
  * `deps` exists to re-run the request when caller-owned inputs change (e.g. a
  * date range). Pass a stable-length array to avoid effect churn.
  */
-export function useApi<T>(path: string, token: string | null, deps: readonly unknown[] = []): ApiState<T> {
+/**
+ * `path` may be `null` to skip the request entirely.
+ *
+ * Used where an endpoint is role-restricted: rather than firing a call that is
+ * guaranteed to 403 for some users, the page passes `null` and renders the
+ * section only for the roles that are allowed to see it.
+ */
+export function useApi<T>(path: string | null, token: string | null, deps: readonly unknown[] = []): ApiState<T> {
   return useApiInternal<T>(path, token, deps, false);
 }
 
@@ -45,7 +52,7 @@ export function useApiPage<T>(
 }
 
 function useApiInternal<T>(
-  path: string,
+  path: string | null,
   token: string | null,
   deps: readonly unknown[],
   paginated: boolean,
@@ -58,12 +65,12 @@ function useApiInternal<T>(
   const depsKey = JSON.stringify(deps ?? []);
   // Trimmed so the cache key and the request URL agree even if the caller's
   // template literal has stray whitespace.
-  const requestPath = path.trim();
+  const requestPath = path?.trim() ?? null;
 
   const reload = useCallback(() => setReloadKey((k) => k + 1), []);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !requestPath) {
       setLoading(false);
       return;
     }

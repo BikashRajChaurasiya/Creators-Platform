@@ -125,6 +125,10 @@ export class ApplicationService {
         include: {
           campaign: { select: { id: true, title: true, status: true, budgetMin: true, budgetMax: true } },
           creator: { include: { user: { select: { id: true, name: true, avatarUrl: true } }, platforms: true } },
+          // Exposed so the portals can tell an accepted-but-unpaid application
+          // from a paid one, and so the payout form can exclude creators who
+          // have already been paid (Payment.applicationId is unique).
+          payment: { select: { id: true, status: true, amount: true, paidAt: true } },
           _count: { select: { submissions: true } },
         },
         orderBy: { createdAt: 'desc' },

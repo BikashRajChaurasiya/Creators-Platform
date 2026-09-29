@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV, ROLE_LABEL, statusColor } from '@/lib/ui';
+import { ROLE_LABEL, adminNavFor, statusColor } from '@/lib/ui';
 import { apiRequest } from '@/lib/api';
 import { Avatar } from '@/components/avatar';
 import { Badge, Button, Card, EmptyState, ErrorState, Pagination, SkeletonCard } from '@/components/ui';
@@ -143,9 +144,9 @@ function Users({ session }: { session: Session }) {
 
 export default function AdminUsersPage() {
   return (
-    <RequireAuth roles={['admin']}>
+    <RequireAuth roles={['admin', 'manager']}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <Users session={session} />
         </PortalShell>
       )}

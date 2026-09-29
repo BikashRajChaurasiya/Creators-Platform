@@ -2,8 +2,9 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV } from '@/lib/ui';
+import { adminNavFor } from '@/lib/ui';
 import { apiRequest, describeApiError } from '@/lib/api';
 import { Button, Card, ErrorState, Input, Spinner } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
@@ -168,7 +169,7 @@ export default function AdminSettingsPage() {
   return (
     <RequireAuth roles={['admin']}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <SettingsPage session={session} />
         </PortalShell>
       )}

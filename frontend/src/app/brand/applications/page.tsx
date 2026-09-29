@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { BRAND_NAV, statusColor } from '@/lib/ui';
-import { apiRequest } from '@/lib/api';
+import { BRAND_NAV, CURRENCY, statusColor } from '@/lib/ui';
+import { apiRequest, describeApiError } from '@/lib/api';
 import { Badge, Button, Card, EmptyState, ErrorState, SkeletonCard, Pagination } from '@/components/ui';
 import { useApiPage } from '@/lib/use-api';
 import { Session } from '@/lib/session';
@@ -17,9 +18,11 @@ interface AppRow {
   createdAt: string;
   creator: { user: { id: string; name: string; avatarUrl?: string | null } };
   campaign: { id: string; title: string };
+  payment: { id: string; status: string; amount: number; paidAt: string | null } | null;
 }
 
 function ReceivedApps({ session }: { session: Session }) {
+  const router = useRouter();
   const [page, setPage] = useState(1);
   const { data, meta, loading, error, reload } = useApiPage<AppRow[]>(`/applications?scope=received&limit=50&page=${page}`, session.tokens.accessToken);
   const [tab, setTab] = useState('ALL');
@@ -40,7 +43,28 @@ function ReceivedApps({ session }: { session: Session }) {
       toast.success(`Application ${decision.toLowerCase()}.`);
       reload();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Review failed');
+      toast.error(describeApiError(e, 'Review failed'));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  /**
+   * Opens (or reuses) a 1:1 thread with this creator and jumps to it. The
+   * backend deduplicates on `campaignId` + participant set, so clicking twice
+   * reuses the same conversation instead of creating a duplicate.
+   */
+  async function message(a: AppRow) {
+    setBusyId(a.id);
+    try {
+      const conversation = await apiRequest<{ id: string }>('/conversations', {
+        method: 'POST',
+        token: session.tokens.accessToken,
+        body: { campaignId: a.campaign.id, participantIds: [a.creator.user.id] },
+      });
+      router.push(`/brand/messages?c=${encodeURIComponent(conversation.id)}`);
+    } catch (e) {
+      toast.error(describeApiError(e, 'Could not open the conversation.'));
     } finally {
       setBusyId(null);
     }
@@ -87,6 +111,11 @@ function ReceivedApps({ session }: { session: Session }) {
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <Badge tone={statusColor(a.status)}>{a.status}</Badge>
+                  {a.payment && (
+                    <Badge tone={statusColor(a.payment.status)}>
+                      {a.payment.status === 'PAID' ? `Paid ${CURRENCY(a.payment.amount)}` : `Payout ${a.payment.status}`}
+                    </Badge>
+                  )}
                   {a.status === 'PENDING' && (
                     <div className="flex gap-1.5">
                       <Button variant="outline" className="px-3 py-1 text-xs" disabled={busyId === a.id} onClick={() => review(a, 'SHORTLISTED')}>
@@ -100,6 +129,14 @@ function ReceivedApps({ session }: { session: Session }) {
                       </Button>
                     </div>
                   )}
+                  <Button
+                    variant="outline"
+                    className="px-3 py-1 text-xs"
+                    disabled={busyId === a.id}
+                    onClick={() => message(a)}
+                  >
+                    Message
+                  </Button>
                 </div>
               </div>
             </Card>

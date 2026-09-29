@@ -1,17 +1,18 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, ShieldCheck } from 'lucide-react';
 import { CREATOR_CATEGORIES, PAYOUT_CHANNELS } from '@ugcnp/shared';
 import { RequireAuth } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
 import { CREATOR_NAV } from '@/lib/ui';
-import { Card, ErrorState, Input, LoadingState, TextArea } from '@/components/ui';
+import { Badge, Button, Card, ErrorState, Input, LoadingState, TextArea } from '@/components/ui';
 import { Avatar } from '@/components/avatar';
 import { UploadImageButton } from '@/components/image-upload';
 import { useApi } from '@/lib/use-api';
 import { apiRequest, describeApiError } from '@/lib/api';
 import { Session } from '@/lib/session';
+import { useToast } from '@/components/toast';
 
 interface CreatorProfile {
   id: string;
@@ -81,7 +82,14 @@ function PayoutSelect({
   );
 }
 
-function CreatorProfileForm({ session, profile }: { session: Session; profile: CreatorProfile }) {
+function verifiedTone(status?: string | null): 'gray' | 'green' | 'amber' | 'red' {
+  if (status === 'VERIFIED') return 'green';
+  if (status === 'PENDING') return 'amber';
+  if (status === 'REJECTED') return 'red';
+  return 'gray';
+}
+
+function CreatorProfileForm({ session, profile, reload }: { session: Session; profile: CreatorProfile; reload: () => void }) {
   const [form, setForm] = useState({
     username: profile.user?.username ?? '',
     category: profile.category ?? '',
@@ -105,8 +113,35 @@ function CreatorProfileForm({ session, profile }: { session: Session; profile: C
   const [avatar, setAvatar] = useState(profile.user?.avatarUrl ?? null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [docUrl, setDocUrl] = useState('');
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const toast = useToast();
 
   useEffect(() => setAvatar(profile.user?.avatarUrl ?? null), [profile.user?.avatarUrl]);
+
+  async function submitVerification() {
+    if (!docUrl) {
+      setVerifyError('Upload or paste a document URL first.');
+      return;
+    }
+    setVerifying(true);
+    setVerifyError(null);
+    try {
+      await apiRequest('/creator/me/verification', {
+        method: 'POST',
+        token: session.tokens.accessToken,
+        body: { documentUrl: docUrl },
+      });
+      setDocUrl('');
+      toast.success('Verification submitted. Our team will review it shortly.');
+      reload();
+    } catch (err) {
+      setVerifyError(describeApiError(err, 'Failed to submit verification.'));
+    } finally {
+      setVerifying(false);
+    }
+  }
 
   function set<K extends keyof typeof form>(k: K, v: string | boolean) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -170,11 +205,63 @@ function CreatorProfileForm({ session, profile }: { session: Session; profile: C
             <UploadImageButton token={session.tokens.accessToken} onUploaded={onAvatar} label="Change avatar" />
           </div>
         </div>
-        <p className="mt-2 text-xs text-neutral-400">
-          Verification status:{' '}
-          <span className="font-medium text-neutral-600">{profile.verificationStatus ?? 'UNVERIFIED'}</span>
-        </p>
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-xs text-neutral-400">Verification status</span>
+          <Badge tone={verifiedTone(profile.verificationStatus)}>
+            {profile.verificationStatus ?? 'UNVERIFIED'}
+          </Badge>
+          {profile.verificationStatus === 'PENDING' && (
+            <span className="text-xs text-neutral-400">Under review</span>
+          )}
+        </div>
       </Card>
+
+      {/* Identity verification — the endpoint existed but had no UI to reach it */}
+      {profile.verificationStatus !== 'VERIFIED' && (
+        <Card>
+          <h2 className="mb-1 flex items-center gap-2 font-semibold">
+            <ShieldCheck className="h-4 w-4 text-primary" /> Verify your identity
+          </h2>
+          <p className="mb-4 text-xs text-neutral-400">
+            Submit a government photo ID or citizenship certificate to get the verified badge and unlock
+            higher-paying campaigns.
+          </p>
+          {profile.verificationStatus === 'PENDING' ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+              Your documents are with our review team. We will update this status once a decision is made.
+            </p>
+          ) : (
+            <div className="flex flex-wrap items-start gap-3">
+              <div className="min-w-[260px] flex-1">
+                <Input
+                  label="Document URL"
+                  value={docUrl}
+                  onChange={(e) => setDocUrl(e.target.value)}
+                  error={verifyError ?? undefined}
+                  placeholder="https://… (or upload below)"
+                />
+              </div>
+              <Button
+                // The whole page is one <form>, so this must not submit the
+                // profile fields.
+                type="button"
+                className="mt-5"
+                disabled={verifying}
+                onClick={submitVerification}
+              >
+                {verifying ? 'Submitting…' : 'Submit for review'}
+              </Button>
+            </div>
+          )}
+          <div className="mt-3">
+            <UploadImageButton
+              token={session.tokens.accessToken}
+              onUploaded={setDocUrl}
+              label="Upload document"
+            />
+          </div>
+        </Card>
+      )}
 
       {/* Basics */}
       <Card>
@@ -309,7 +396,7 @@ function CreatorProfilePageInner({ session }: { session: Session }) {
   }
   if (!data) return null;
 
-  return <CreatorProfileForm session={session} profile={data} />;
+  return <CreatorProfileForm session={session} profile={data} reload={reload} />;
 }
 
 export default function CreatorProfilePage() {

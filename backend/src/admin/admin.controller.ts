@@ -48,6 +48,12 @@ const taskSchema = z.object({
 });
 const taskUpdateSchema = z.object({ status: z.string().optional(), title: z.string().optional(), priority: z.string().optional(), assigneeId: z.string().optional().nullable() });
 const disputeResolveSchema = z.object({ resolution: z.string().trim().min(3, 'Resolution is required').max(3000) }).strict();
+const verificationReviewSchema = z
+  .object({
+    status: z.enum(['VERIFIED', 'REJECTED']),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .strict();
 
 const auditQuery = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(50), action: z.string().optional() });
 
@@ -127,6 +133,33 @@ export class AdminController {
   @Patch('disputes/:id/resolve')
   resolve(@CurrentUser() user: never, @Param('id') id: string, @Body(new ZodValidationPipe(disputeResolveSchema)) body: { resolution: string }) {
     return { data: this.admin.resolveDispute(user as never, id, body.resolution) };
+  }
+
+  // identity verification
+  @Get('verifications')
+  @Permissions('creators.verify')
+  listVerifications(@Query('status') status?: string) {
+    return this.admin.listVerifications(status || 'PENDING');
+  }
+
+  @Patch('creator-verifications/:id')
+  @Permissions('creators.verify')
+  reviewCreator(
+    @CurrentUser() user: never,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(verificationReviewSchema)) body: { status: 'VERIFIED' | 'REJECTED'; notes?: string },
+  ) {
+    return { data: this.admin.reviewCreatorVerification(user as never, id, body.status, body.notes) };
+  }
+
+  @Patch('brand-verifications/:id')
+  @Permissions('brands.verify')
+  reviewBrand(
+    @CurrentUser() user: never,
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(verificationReviewSchema)) body: { status: 'VERIFIED' | 'REJECTED'; notes?: string },
+  ) {
+    return { data: this.admin.reviewBrandVerification(user as never, id, body.status, body.notes) };
   }
 
   // reports / settings / audit

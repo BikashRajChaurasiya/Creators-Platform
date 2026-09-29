@@ -1,8 +1,9 @@
 'use client';
 
 import { RequireAuth } from '@/components/require-auth';
+import type { AllowedRole } from '@/components/require-auth';
 import { PortalShell } from '@/components/portal-shell';
-import { ADMIN_NAV, CURRENCY } from '@/lib/ui';
+import { ADMIN_CONSOLE_ROLES, CURRENCY, adminNavFor } from '@/lib/ui';
 import { Card, ErrorState, SkeletonCard, StatCard } from '@/components/ui';
 import { useApi } from '@/lib/use-api';
 import { Session } from '@/lib/session';
@@ -26,7 +27,13 @@ interface FinanceOverview {
 
 function AdminDash({ session }: { session: Session }) {
   const rep = useApi<Report>('/admin/reports/summary', session.tokens.accessToken);
-  const finance = useApi<FinanceOverview>('/admin/finance', session.tokens.accessToken);
+  // `/admin/finance` is restricted to ADMIN/FINANCE server-side, so MANAGER and
+  // QA must not request it — the call would 403 on every dashboard load.
+  const canSeeFinance = session.user.role === 'ADMIN' || session.user.role === 'FINANCE';
+  const finance = useApi<FinanceOverview>(
+    canSeeFinance ? '/admin/finance' : null,
+    session.tokens.accessToken,
+  );
   const f = finance.data;
 
   const r = rep.data;
@@ -89,9 +96,9 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 
 export default function AdminDashboardPage() {
   return (
-    <RequireAuth roles={['admin']}>
+    <RequireAuth roles={ADMIN_CONSOLE_ROLES}>
       {(session) => (
-        <PortalShell title="Admin console" session={session} items={ADMIN_NAV}>
+        <PortalShell title="Admin console" session={session} items={adminNavFor(session.user.role.toLowerCase() as AllowedRole)}>
           <AdminDash session={session} />
         </PortalShell>
       )}

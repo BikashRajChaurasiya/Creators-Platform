@@ -196,7 +196,6 @@ export const campaignSchema = z
       perCreator: z.boolean().default(true),
     }),
     usageRights: z.enum(USAGE_RIGHTS),
-    status: z.enum(CAMPAIGN_STATUSES).optional(),
   })
   .strict();
 

@@ -23,7 +23,7 @@ interface BrandProfile {
   user: { name: string; avatarUrl?: string | null };
 }
 
-function BrandProfileForm({ session, profile }: { session: Session; profile: BrandProfile }) {
+function BrandProfileForm({ session, profile, reload }: { session: Session; profile: BrandProfile; reload: () => void }) {
   const [form, setForm] = useState({
     companyName: profile.companyName ?? '',
     industry: profile.industry ?? '',
@@ -89,6 +89,9 @@ function BrandProfileForm({ session, profile }: { session: Session; profile: Bra
       });
       setDocUrl('');
       setMessage('Verification submitted. Our team will review it shortly.');
+      // The status badge reads the profile, so refresh it or the page keeps
+      // claiming UNVERIFIED after a successful submission.
+      reload();
     } catch (err) {
       setMessage(describeApiError(err, 'Failed to submit verification.'));
     } finally {
@@ -189,7 +192,7 @@ function BrandProfilePageInner({ session }: { session: Session }) {
   }
   if (!data) return null;
 
-  return <BrandProfileForm session={session} profile={data} />;
+  return <BrandProfileForm session={session} profile={data} reload={reload} />;
 }
 
 export default function BrandProfilePage() {
